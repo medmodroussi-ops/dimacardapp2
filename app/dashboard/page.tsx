@@ -5,8 +5,10 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { 
   Upload, Loader2, Link as LinkIcon, Copy, ExternalLink, 
-  LogOut, Save, User as UserIcon, Briefcase, Phone, Globe, Plus, Trash2
+  LogOut, Save, User as UserIcon, Briefcase, Phone, Globe, Plus, Trash2,
+  QrCode, X, Download // 🟢 Ajout des icônes nécessaires pour le QR Code
 } from 'lucide-react'
+import { QRCodeCanvas } from 'qrcode.react' // 🟢 Importation de la librairie QR Code
 
 export default function Dashboard() {
   const supabase = createClient()
@@ -16,6 +18,9 @@ export default function Dashboard() {
   const [updating, setUpdating] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  
+  // 🟢 Nouvel état pour gérer l'affichage de la fenêtre du QR Code
+  const [showQrModal, setShowQrModal] = useState(false)
   
   const [profile, setProfile] = useState({
     full_name: '',
@@ -27,7 +32,7 @@ export default function Dashboard() {
     email_contact: '', 
     website_url: '',   
     whatsapp: '',
-    custom_links: [] as { id: string, title: string, url: string }[] // NOUVEAU : Le tableau des liens dynamiques
+    custom_links: [] as { id: string, title: string, url: string }[]
   })
 
   useEffect(() => {
@@ -46,7 +51,6 @@ export default function Dashboard() {
       
       setUserId(user.id)
 
-      // On ajoute custom_links dans le select
       const { data, error } = await supabase
         .from('profiles')
         .select(`full_name, job_title, company, phone, linkedin_url, avatar_url, email_contact, website_url, whatsapp, custom_links`)
@@ -63,9 +67,9 @@ export default function Dashboard() {
           linkedin_url: d.linkedin_url || '',
           avatar_url: d.avatar_url || '',
           email_contact: d.email_contact || '',
-          website_url: d.website_url || '',     
+          website_url: d.website_url || '',    
           whatsapp: d.whatsapp || '',
-          custom_links: d.custom_links || [] // On charge les liens ou on met un tableau vide par défaut
+          custom_links: d.custom_links || [] 
         })
       }
     } catch (error) {
@@ -83,12 +87,25 @@ export default function Dashboard() {
     }
   }
 
+  // 🟢 Fonction pour télécharger le QR Code du client
+  const downloadQRCode = () => {
+    const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement
+    if (canvas) {
+      const pngUrl = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream')
+      let downloadLink = document.createElement('a')
+      downloadLink.href = pngUrl
+      downloadLink.download = `Mon_QRCode_${profile.full_name || 'Profil'}.png`
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+      document.body.removeChild(downloadLink)
+    }
+  }
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
-  // --- NOUVELLES FONCTIONS POUR LES LIENS DYNAMIQUES ---
   const addCustomLink = () => {
     setProfile({
       ...profile,
@@ -107,7 +124,6 @@ export default function Dashboard() {
     const updatedLinks = profile.custom_links.filter(link => link.id !== id)
     setProfile({ ...profile, custom_links: updatedLinks })
   }
-  // ----------------------------------------------------
 
   async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
@@ -206,9 +222,16 @@ export default function Dashboard() {
                 </a>
               </div>
             </div>
-            <button onClick={copyToClipboard} className="shrink-0 w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
-              <Copy size={16} /> Copier le lien
-            </button>
+            
+            {/* 🟢 Ajout du bouton QR Code à côté de Copier le lien */}
+            <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 shrink-0">
+              <button onClick={() => setShowQrModal(true)} className="w-full sm:w-auto bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+                <QrCode size={16} /> Mon QR Code
+              </button>
+              <button onClick={copyToClipboard} className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+                <Copy size={16} /> Copier le lien
+              </button>
+            </div>
           </div>
         )}
 
@@ -287,7 +310,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* BLOC 4 : NOUVEAU - Liens Personnalisés Dynamiques */}
+          {/* BLOC 4 : Liens Personnalisés Dynamiques */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
             <h2 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
               <Globe className="text-blue-600" size={20} /> Liens additionnels
@@ -345,6 +368,37 @@ export default function Dashboard() {
 
         </form>
       </main>
+
+      {/* 🟢 MODAL QR CODE DU CLIENT */}
+      {showQrModal && userId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] w-full max-w-sm shadow-2xl overflow-hidden p-8 text-center relative">
+            <button onClick={() => setShowQrModal(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-all">
+              <X size={20} />
+            </button>
+            
+            <h2 className="text-xl font-black text-slate-900 mb-1">Mon QR Code</h2>
+            <p className="text-sm text-slate-500 mb-8">Scannez pour voir votre carte de visite</p>
+
+            <div className="flex justify-center bg-slate-50 p-6 rounded-3xl border border-slate-100 inline-block mx-auto mb-8">
+              <QRCodeCanvas 
+                id="qr-canvas"
+                value={`${window.location.origin}/p/${userId}`} 
+                size={200}
+                bgColor={"#ffffff"}
+                fgColor={"#0f172a"}
+                level={"H"}
+                includeMargin={false}
+              />
+            </div>
+
+            <button onClick={downloadQRCode} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-indigo-200">
+              <Download size={20} /> Télécharger l'image PNG
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

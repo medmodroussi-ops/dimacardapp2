@@ -3,125 +3,120 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
+import { Loader2, Mail, Lock, LogIn } from 'lucide-react'
 
-export default function Login() {
+export default function LoginPage() {
+  const router = useRouter()
+  const supabase = createClient()
+  
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  
-  const router = useRouter()
-  const supabase = createClient()
+  const [errorMsg, setErrorMsg] = useState('')
 
-  // Fonction pour l'inscription (Créer un compte)
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
+    setErrorMsg('')
 
-    if (error) {
-      setError(error.message)
-    } else {
-      alert('Inscription réussie ! Merci vérifie ta boîte mail.')
-      // Redirection optionnelle ou on laisse l'utilisateur se connecter
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        setErrorMsg("Email ou mot de passe incorrect.")
+        setLoading(false)
+        return
+      }
+
+      if (data?.user) {
+        // 🟢 C'EST ICI QUE LA MAGIE OPÈRE : LE TRI INTELLIGENT
+        
+        // ⚠️ REMPLACEZ PAR VOTRE VRAI EMAIL ADMINISTRATEUR
+        const adminEmails = ['test@test.com'] 
+
+        if (data.user.email && adminEmails.includes(data.user.email)) {
+          // C'est l'administrateur -> Go au Panel Admin
+          router.push('/admin')
+        } else {
+          // C'est un client normal -> Go au Dashboard Client
+          router.push('/dashboard')
+        }
+      }
+    } catch (err) {
+      setErrorMsg("Une erreur inattendue s'est produite.")
+      setLoading(false)
     }
-    setLoading(false)
-  }
-
-  // Fonction pour la connexion
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError('Email ou mot de passe incorrect.')
-    } else {
-      // Si succès, on redirige vers le dashboard
-      router.push('/dashboard')
-      router.refresh()
-    }
-    setLoading(false)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-        
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Espace Client
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Gérez votre carte de visite digitale
-          </p>
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
+          <LogIn size={32} />
         </div>
+        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Connexion</h2>
+        <p className="mt-2 text-sm text-slate-500 font-medium">Accédez à votre espace DimaCardAPP</p>
+      </div>
 
-        <form className="mt-8 space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Adresse Email
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="client@entreprise.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Mot de passe
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded">
-              {error}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3 pt-2">
-            <button
-              onClick={handleSignIn}
-              disabled={loading}
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
-            >
-              {loading ? 'Chargement...' : 'Se connecter'}
-            </button>
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-3xl sm:px-10 border border-slate-100">
+          
+          <form className="space-y-6" onSubmit={handleLogin}>
             
+            {errorMsg && (
+              <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-bold text-center">
+                {errorMsg}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Adresse Email</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                  <Mail size={18} />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                  placeholder="exemple@email.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Mot de passe</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                  <Lock size={18} />
+                </div>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
             <button
-              onClick={handleSignUp}
+              type="submit"
               disabled={loading}
-              className="w-full bg-white text-blue-600 border border-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
+              className="w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
             >
-              Créer un compte
+              {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+              {loading ? 'Connexion en cours...' : 'Se connecter'}
             </button>
-          </div>
-        </form>
+          </form>
+
+        </div>
       </div>
     </div>
   )

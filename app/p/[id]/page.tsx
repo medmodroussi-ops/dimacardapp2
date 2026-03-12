@@ -2,229 +2,244 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { User, Building2, Phone, Linkedin, Download, Mail, Globe, MessageCircle, ExternalLink } from 'lucide-react'
+import { 
+  User, Building2, Phone, Linkedin, Download, Mail, 
+  Globe, MessageCircle, MapPin, ChevronRight, AlignLeft,
+  Ban // Icône pour le profil suspendu
+} from 'lucide-react'
 import { useParams } from 'next/navigation'
 
 export default function PublicProfile() {
   const params = useParams()
   const id = params.id as string
-
   const supabase = createClient()
+  
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isSuspended, setIsSuspended] = useState(false)
 
   useEffect(() => {
     async function fetchProfile() {
       if (!id) return
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id)
+          .single()
+        
+        if (error) {
+          console.error("Erreur Supabase:", error.message)
+        } else if (data) {
+          
+          // Vérification de l'état
+          const currentStatus = data.status ? data.status.toLowerCase().trim() : 'actif'
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (data) setProfile(data)
-      setLoading(false)
+          if (currentStatus === 'suspendu') {
+            setIsSuspended(true)
+            setProfile(null) // On cache les données en mémoire
+          } else {
+            setIsSuspended(false)
+            setProfile(data) // On charge les données
+          }
+        }
+      } catch (err) {
+        console.error("Erreur inattendue", err)
+      } finally {
+        setLoading(false)
+      }
     }
     
     fetchProfile()
-  }, [id])
+  }, [id, supabase])
 
-  const getBase64Image = async (url: string) => {
-    try {
-      const response = await fetch(url)
-      const blob = await response.blob()
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          const base64data = (reader.result as string).split(',')[1] 
-          resolve({ base64: base64data, type: blob.type.split('/')[1].toUpperCase() })
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(blob)
-      })
-    } catch (error) {
-      console.error("Erreur de conversion d'image", error)
-      return null
-    }
-  }
-
-  const downloadVCard = async () => {
+  const downloadVCard = () => {
     if (!profile) return
+    const vCard = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN;CHARSET=UTF-8:${profile.full_name || ''}`,
+      `ORG;CHARSET=UTF-8:${profile.company || ''}`,
+      `TITLE;CHARSET=UTF-8:${profile.job_title || ''}`,
+      `TEL;TYPE=CELL:${profile.phone || ''}`,
+      `TEL;TYPE=WORK:${profile.whatsapp || ''}`,
+      `EMAIL;TYPE=INTERNET:${profile.email_contact || ''}`,
+      `ADR;TYPE=WORK;CHARSET=UTF-8:;;${profile.address || ''};;;`,
+      `URL:${profile.website_url || ''}`,
+      'END:VCARD'
+    ].join('\r\n')
 
-    let photoVCard = ''
-    if (profile.avatar_url) {
-      const imgData: any = await getBase64Image(profile.avatar_url)
-      if (imgData) {
-        photoVCard = `\nPHOTO;ENCODING=b;TYPE=${imgData.type}:${imgData.base64}`
-      }
-    }
-
-    // NOUVEAU : On ajoute automatiquement tous les liens personnalisés à la VCard
-    let customUrlsVCard = ''
-    if (profile.custom_links && Array.isArray(profile.custom_links)) {
-      profile.custom_links.forEach((link: any) => {
-        if (link.url) customUrlsVCard += `\nURL:${link.url}`
-      })
-    }
-
-    const vcfData = `BEGIN:VCARD
-VERSION:3.0
-FN:${profile.full_name || ''}
-ORG:${profile.company || ''}
-TITLE:${profile.job_title || ''}
-TEL;TYPE=WORK,VOICE:${profile.phone || ''}
-TEL;TYPE=CELL,VOICE:${profile.whatsapp || ''}
-EMAIL;TYPE=WORK:${profile.email_contact || ''}
-URL:${profile.website_url || ''}
-URL;type=LinkedIn:${profile.linkedin_url || ''}${customUrlsVCard}${photoVCard}
-END:VCARD`
-
-    const blob = new Blob([vcfData], { type: 'text/vcard' })
-    const url = URL.createObjectURL(blob)
+    const blob = new Blob([vCard], { type: 'text/vcard;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${(profile.full_name || 'contact').replace(/\s+/g, '_')}.vcf`
+    link.setAttribute('download', `${profile.full_name || 'contact'}.vcf`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
+  // --- 1. ÉTAT : CHARGEMENT ---
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-slate-500 font-medium animate-pulse">Chargement de la carte...</p></div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    )
   }
 
+  // --- 2. ÉTAT : SUSPENDU ---
+  if (isSuspended) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center font-sans">
+        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-6 shadow-sm">
+          <Ban size={40} />
+        </div>
+        <h1 className="text-2xl font-black text-slate-800 tracking-tight">Profil indisponible</h1>
+        <p className="mt-3 text-slate-500 max-w-sm">
+          Cette carte de visite numérique a été suspendue ou n'est plus accessible pour le moment.
+        </p>
+        <div className="mt-10 py-6 border-t border-slate-200 w-full max-w-xs flex flex-col items-center gap-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Propulsé par</span>
+            <span className="text-xs font-bold text-slate-300">DimaCardApp</span>
+        </div>
+      </div>
+    )
+  }
+
+  // --- 3. ÉTAT : INTROUVABLE ---
   if (!profile) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50"><p className="text-slate-500 font-medium">Profil introuvable.</p></div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-500">
+        Ce profil n'existe pas.
+      </div>
+    )
   }
 
+  // --- 4. ÉTAT : AFFICHAGE NORMAL DU PROFIL (Complet) ---
   return (
-    <div className="min-h-screen bg-slate-100 flex justify-center items-start sm:py-10">
-      <div className="w-full max-w-md bg-white sm:rounded-3xl shadow-xl overflow-hidden min-h-screen sm:min-h-0">
+    <div className="min-h-screen bg-[#F8FAFC] flex justify-center items-start text-slate-900 font-sans">
+      <div className="w-full max-w-md flex flex-col min-h-screen bg-white shadow-2xl">
         
-        <div className="h-40 bg-gradient-to-r from-blue-600 to-indigo-700 relative">
-          <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 w-28 h-28 bg-white rounded-full p-1.5 shadow-lg">
-            {profile.avatar_url ? (
-              <img 
-                src={profile.avatar_url} 
-                alt={profile.full_name} 
-                className="w-full h-full rounded-full object-cover border border-slate-100"
-              />
-            ) : (
-              <div className="w-full h-full bg-slate-100 rounded-full flex items-center justify-center text-slate-300">
-                <User size={48} />
-              </div>
-            )}
+        {/* HEADER VISUEL */}
+        <div className="relative h-56 w-full">
+          <div className="absolute inset-0 bg-gradient-to-tr from-blue-700 to-indigo-900"></div>
+          <div className="absolute -bottom-12 w-full flex justify-center">
+            <div className="w-32 h-32 rounded-[2.5rem] bg-white p-1 shadow-2xl overflow-hidden ring-4 ring-white">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover rounded-[2.2rem]" />
+              ) : (
+                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={50} /></div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="pt-16 pb-10 px-6 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">{profile.full_name}</h1>
-          <p className="text-blue-600 font-semibold mt-1 text-lg">{profile.job_title}</p>
-          {profile.company && (
-            <p className="text-slate-500 mt-1 flex items-center justify-center gap-1.5 font-medium">
-              <Building2 size={16} /> {profile.company}
-            </p>
+        {/* INFOS PRINCIPALES */}
+        <div className="mt-16 px-8 text-center">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">{profile.full_name}</h1>
+          <div className="mt-2 flex flex-col items-center gap-1">
+            <span className="text-blue-600 font-extrabold uppercase tracking-widest text-[11px] px-3 py-1 bg-blue-50 rounded-full">
+              {profile.job_title}
+            </span>
+            <div className="flex items-center gap-1.5 text-slate-500 font-medium text-sm mt-1">
+              <Building2 size={16} />
+              <span>{profile.company || 'Cardmesh'}</span>
+            </div>
+          </div>
+          
+          {profile.bio && (
+            <div className="mt-5 p-4 bg-slate-50 rounded-2xl text-slate-600 text-sm leading-relaxed text-left border border-slate-100 flex gap-3">
+              <AlignLeft size={20} className="text-slate-400 shrink-0 mt-0.5" />
+              <p>{profile.bio}</p>
+            </div>
           )}
+        </div>
 
-          <button 
-            onClick={downloadVCard}
-            className="mt-8 w-full bg-slate-900 text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-md hover:shadow-lg active:scale-[0.98]"
-          >
-            <Download size={20} />
-            Enregistrer le contact
+        {/* BOUTON ENREGISTRER */}
+        <div className="px-6 mt-8">
+          <button onClick={downloadVCard} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all">
+            <Download size={22} /> Enregistrer le Contact
           </button>
+        </div>
 
-          <div className="mt-8 text-left space-y-3">
-            
-            {/* --- CONTACTS STANDARDS --- */}
+        {/* COORDONNÉES ET CONTACTS */}
+        <div className="px-6 mt-10 space-y-6 pb-12">
+          
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Contact Direct</h3>
+
+          {/* Numéros en gros */}
+          <div className="space-y-3">
             {profile.phone && (
-              <a href={`tel:${profile.phone}`} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-300 hover:bg-white transition-all group">
-                <div className="bg-slate-200 text-slate-700 p-3 rounded-xl group-hover:bg-slate-800 group-hover:text-white transition-colors">
-                  <Phone size={20} />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">Téléphone</p>
-                  <p className="text-slate-900 font-bold">{profile.phone}</p>
+              <a href={`tel:${profile.phone}`} className="flex items-center gap-4 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl group transition-all">
+                <div className="w-12 h-12 flex items-center justify-center bg-white text-blue-600 rounded-xl shadow-sm"><Phone size={22} /></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-blue-400 uppercase">Téléphone</span>
+                  <span className="text-lg font-black text-blue-900">{profile.phone}</span>
                 </div>
               </a>
             )}
 
             {profile.whatsapp && (
-              <a href={`https://wa.me/${profile.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 hover:border-emerald-300 hover:bg-white transition-all group">
-                <div className="bg-emerald-500 text-white p-3 rounded-xl shadow-sm group-hover:bg-emerald-600 transition-colors">
-                  <MessageCircle size={20} />
-                </div>
-                <div>
-                  <p className="text-xs text-emerald-700 font-medium">WhatsApp</p>
-                  <p className="text-emerald-900 font-bold">{profile.whatsapp}</p>
+              <a href={`https://wa.me/${profile.whatsapp.replace(/\D/g,'')}`} className="flex items-center gap-4 p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl group transition-all">
+                <div className="w-12 h-12 flex items-center justify-center bg-white text-emerald-500 rounded-xl shadow-sm"><MessageCircle size={22} /></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase">WhatsApp</span>
+                  <span className="text-lg font-black text-emerald-900">{profile.whatsapp}</span>
                 </div>
               </a>
             )}
+          </div>
 
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pt-4 ml-1">Informations Complémentaires</h3>
+          <div className="space-y-3">
             {profile.email_contact && (
-              <a href={`mailto:${profile.email_contact}`} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-300 hover:bg-white transition-all group">
-                <div className="bg-red-100 text-red-600 p-3 rounded-xl group-hover:bg-red-500 group-hover:text-white transition-colors">
-                  <Mail size={20} />
-                </div>
+              <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl">
+                <div className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl"><Mail size={20} /></div>
                 <div className="overflow-hidden">
-                  <p className="text-xs text-slate-500 font-medium">Email professionnel</p>
-                  <p className="text-slate-900 font-bold truncate">{profile.email_contact}</p>
-                </div>
-              </a>
-            )}
-
-            {profile.website_url && (
-              <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-300 hover:bg-white transition-all group">
-                <div className="bg-purple-100 text-purple-600 p-3 rounded-xl group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                  <Globe size={20} />
-                </div>
-                <div className="overflow-hidden">
-                  <p className="text-xs text-slate-500 font-medium">Site Web</p>
-                  <p className="text-slate-900 font-bold truncate">{profile.website_url.replace(/^https?:\/\//, '')}</p>
-                </div>
-              </a>
-            )}
-
-            {profile.linkedin_url && (
-              <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-300 hover:bg-white transition-all group">
-                <div className="bg-blue-100 text-blue-600 p-3 rounded-xl group-hover:bg-[#0A66C2] group-hover:text-white transition-colors">
-                  <Linkedin size={20} />
-                </div>
-                <div className="overflow-hidden">
-                  <p className="text-xs text-slate-500 font-medium">LinkedIn</p>
-                  <p className="text-slate-900 font-bold truncate">{profile.linkedin_url.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '')}</p>
-                </div>
-              </a>
-            )}
-
-            {/* --- NOUVEAU : LIENS DYNAMIQUES PERSONNALISÉS --- */}
-            {profile.custom_links && profile.custom_links.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-slate-200">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 text-center">Liens additionnels</h3>
-                <div className="space-y-3">
-                  {profile.custom_links.map((link: any) => link.title && link.url && (
-                    <a 
-                      key={link.id} 
-                      href={link.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="flex items-center gap-4 p-4 rounded-2xl bg-white border-2 border-slate-100 hover:border-blue-500 hover:shadow-md transition-all group"
-                    >
-                      <div className="bg-slate-50 text-slate-400 p-3 rounded-xl group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                        <ExternalLink size={20} />
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <p className="text-slate-900 font-bold text-sm">{link.title}</p>
-                        <p className="text-xs text-slate-500 truncate mt-0.5">{link.url.replace(/^https?:\/\//, '')}</p>
-                      </div>
-                    </a>
-                  ))}
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Email</p>
+                  <p className="text-sm font-bold text-slate-700 truncate">{profile.email_contact}</p>
                 </div>
               </div>
             )}
 
+            {profile.address && (
+              <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl">
+                <div className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl"><MapPin size={20} /></div>
+                <div className="overflow-hidden">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Adresse</p>
+                  <p className="text-sm font-bold text-slate-700">{profile.address}</p>
+                </div>
+              </div>
+            )}
+
+            {profile.website_url && (
+              <a href={profile.website_url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-xl"><Globe size={20} /></div>
+                  <span className="text-sm font-bold text-slate-700">Site Internet</span>
+                </div>
+                <ChevronRight size={18} className="text-slate-300" />
+              </a>
+            )}
+
+            {profile.linkedin_url && (
+              <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 flex items-center justify-center bg-[#0A66C2]/10 text-[#0A66C2] rounded-xl"><Linkedin size={20} /></div>
+                  <span className="text-sm font-bold text-slate-700">Profil LinkedIn</span>
+                </div>
+                <ChevronRight size={18} className="text-slate-300" />
+              </a>
+            )}
           </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="py-12 flex flex-col items-center gap-3">
+          <div className="h-px w-12 bg-slate-200"></div>
+          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">Cardmesh Digital</p>
         </div>
       </div>
     </div>
