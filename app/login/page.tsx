@@ -27,7 +27,7 @@ export default function Login() {
     if (error) {
       setError(error.message)
     } else {
-      alert('Inscription réussie ! (Si la confirmation par email est activée sur Supabase, vérifie ta boîte mail).')
+      alert('Inscription réussie ! Merci vérifie ta boîte mail.')
       // Redirection optionnelle ou on laisse l'utilisateur se connecter
     }
     setLoading(false)
