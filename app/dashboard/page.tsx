@@ -175,7 +175,7 @@ export default function Dashboard() {
               <div className="bg-blue-600 text-white p-1.5 rounded-lg">
                 <LinkIcon size={20} />
               </div>
-              <span className="text-xl font-bold text-slate-900">Cardmesh</span>
+              <span className="text-xl font-bold text-slate-900">DimaCardAPP</span>
             </div>
             <button onClick={handleSignOut} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-red-600 transition-colors">
               <LogOut size={18} />
