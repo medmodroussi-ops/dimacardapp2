@@ -79,27 +79,60 @@ export default function Dashboard() {
     } finally { setUpdating(false) }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>
+  // --- ÉCRAN DE CHARGEMENT AVEC LOGO DIMACARD ---
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <div className="relative">
+        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+        <img 
+          src="/dimacardlogo.jpeg" 
+          alt="Loading DimaCard" 
+          className="w-24 h-24 object-contain relative z-10 animate-bounce" 
+          style={{ animationDuration: '2s' }}
+        />
+      </div>
+      <div className="mt-8 w-48 h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full bg-blue-600 rounded-full animate-infinite-loading"></div>
+      </div>
+      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">DimaCard</p>
+      <style jsx>{`
+        @keyframes infinite-loading {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-infinite-loading {
+          width: 100%;
+          animation: infinite-loading 1.5s infinite linear;
+        }
+      `}</style>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-20 font-sans">
+      {/* NAVBAR AVEC LOGO */}
       <nav className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 h-20 flex justify-between items-center">
-          <div className="flex items-center gap-2 font-black text-xl text-slate-900"><LinkIcon className="text-blue-600"/> DimaCard</div>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="text-slate-500 font-bold flex items-center gap-2 hover:text-red-500 transition-colors"><LogOut size={18}/> Quitter</button>
+          <div className="flex items-center gap-3">
+             <img src="/dimacardlogo.jpeg" alt="DimaCard Logo" className="h-10 w-auto object-contain" />
+             <span className="font-black text-xl text-slate-900 tracking-tight hidden sm:block">DimaCard</span>
+          </div>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="text-slate-500 font-bold flex items-center gap-2 hover:text-red-500 transition-colors">
+            <LogOut size={18}/> <span className="hidden sm:inline">Quitter</span>
+          </button>
         </div>
       </nav>
 
       <main className="max-w-3xl mx-auto px-4 mt-10">
-        {/* LIEN PUBLIC CORRIGÉ POUR MOBILE */}
+        {/* LIEN PUBLIC */}
         <div className="bg-white rounded-[2rem] p-6 shadow-sm border mb-8 flex flex-col md:flex-row items-center gap-6 overflow-hidden">
           <div className="flex-1 w-full min-w-0">
             <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Votre lien public</p>
             <p className="text-slate-400 text-sm truncate block">{`${window.location.origin}/p/${userId}`}</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto shrink-0">
-            <button onClick={() => setShowQrModal(true)} className="flex-1 md:flex-none bg-slate-900 text-white px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all text-sm whitespace-nowrap"><QrCode size={18}/> QR Code</button>
-            <button onClick={copyToClipboard} className="flex-1 md:flex-none bg-slate-100 text-slate-700 px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all text-sm whitespace-nowrap"><Copy size={18}/> Copier</button>
+            <button type="button" onClick={() => setShowQrModal(true)} className="flex-1 md:flex-none bg-slate-900 text-white px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all text-sm whitespace-nowrap"><QrCode size={18}/> QR Code</button>
+            <button type="button" onClick={copyToClipboard} className="flex-1 md:flex-none bg-slate-100 text-slate-700 px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all text-sm whitespace-nowrap"><Copy size={18}/> Copier</button>
           </div>
         </div>
 
@@ -108,11 +141,13 @@ export default function Dashboard() {
             <h2 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-900"><UserIcon size={20} className="text-blue-600"/> Identité</h2>
             <div className="flex flex-col md:flex-row gap-8 mb-8 items-center">
               <div className="relative">
-                <div className="w-28 h-28 rounded-[2rem] overflow-hidden bg-slate-100 border-4 border-slate-50">
+                <div className="w-28 h-28 rounded-[2rem] overflow-hidden bg-slate-100 border-4 border-slate-50 shadow-inner">
                   {profile.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full p-6 text-slate-300" />}
                   {uploadingImage && <div className="absolute inset-0 bg-white/60 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>}
                 </div>
-                <label className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-lg cursor-pointer shadow-lg hover:scale-110 transition-transform"><Upload size={16}/><input type="file" className="hidden" accept="image/*" onChange={uploadAvatar} /></label>
+                <label className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-lg cursor-pointer shadow-lg hover:scale-110 transition-transform">
+                  <Upload size={16}/><input type="file" className="hidden" accept="image/*" onChange={uploadAvatar} />
+                </label>
               </div>
               <div className="grid grid-cols-1 gap-4 flex-1 w-full">
                 <InputGroup label="Nom complet" value={profile.full_name} onChange={(v) => setProfile({...profile, full_name: v})} />
@@ -141,21 +176,22 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <button type="submit" disabled={updating} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50">
-            {updating ? <Loader2 className="animate-spin" size={24}/> : <Save size={24}/>} Enregistrer
+          <button type="submit" disabled={updating} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3">
+            {updating ? <Loader2 className="animate-spin" size={24}/> : <Save size={24}/>} Enregistrer les modifications
           </button>
         </form>
       </main>
 
+      {/* MODAL QR CODE */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white p-8 rounded-[2.5rem] max-w-sm w-full text-center relative shadow-2xl animate-in zoom-in duration-200">
             <button onClick={() => setShowQrModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900"><X size={24}/></button>
             <h2 className="text-xl font-black mb-6">Votre QR Code</h2>
-            <div className="bg-slate-50 p-6 rounded-3xl inline-block mb-6 shadow-inner">
+            <div className="bg-slate-50 p-6 rounded-3xl inline-block mb-6 shadow-inner border border-slate-100">
               <QRCodeCanvas id="qr-canvas" value={`${window.location.origin}/p/${userId}`} size={200} level="H" includeMargin={true} />
             </div>
-            <button onClick={downloadQRCode} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all"><Download size={18}/> Télécharger l'image</button>
+            <button onClick={downloadQRCode} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-95 shadow-lg"><Download size={18}/> Télécharger l'image</button>
           </div>
         </div>
       )}
@@ -166,8 +202,14 @@ export default function Dashboard() {
 function InputGroup({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) {
   return (
     <div className="flex flex-col gap-1 w-full text-left">
-      <label className="text-[10px] font-black uppercase text-slate-400 ml-1">{label}</label>
-      <input type="text" value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl font-bold text-sm outline-none focus:border-blue-300 focus:bg-white transition-all text-slate-700" placeholder="..." />
+      <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-wider">{label}</label>
+      <input 
+        type="text" 
+        value={value || ''} 
+        onChange={(e) => onChange(e.target.value)} 
+        className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl font-bold text-sm outline-none focus:border-blue-300 focus:bg-white transition-all text-slate-700 shadow-sm" 
+        placeholder="..." 
+      />
     </div>
   )
 }
