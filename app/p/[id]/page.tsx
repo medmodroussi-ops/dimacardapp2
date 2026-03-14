@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { 
-  User, Building2, Phone, Linkedin, Download, Mail, 
-  Globe, MessageCircle, MapPin, ChevronRight, AlignLeft,
-  Ban // Icône pour le profil suspendu
+  User, Phone, Linkedin, Download, Mail, Globe, MessageCircle, 
+  ChevronRight, ShieldCheck, Instagram, Youtube, Video, Ghost,
+  Clock, ShieldAlert
 } from 'lucide-react'
 import { useParams } from 'next/navigation'
 
@@ -16,232 +16,195 @@ export default function PublicProfile() {
   
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [isSuspended, setIsSuspended] = useState(false)
+  const [isBlocked, setIsBlocked] = useState({ expired: false, suspended: false })
 
   useEffect(() => {
     async function fetchProfile() {
-      if (!id) return
+      const { data } = await supabase.from('profiles').select('*').eq('id', id).single()
       
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', id)
-          .single()
+      if (data) {
+        const today = new Date()
+        const expirationDate = data.expiration_date ? new Date(data.expiration_date) : null
         
-        if (error) {
-          console.error("Erreur Supabase:", error.message)
-        } else if (data) {
-          
-          // Vérification de l'état
-          const currentStatus = data.status ? data.status.toLowerCase().trim() : 'actif'
+        const expired = expirationDate ? expirationDate < today : false
+        const suspended = data.status === 'suspendu'
 
-          if (currentStatus === 'suspendu') {
-            setIsSuspended(true)
-            setProfile(null) // On cache les données en mémoire
-          } else {
-            setIsSuspended(false)
-            setProfile(data) // On charge les données
-          }
-        }
-      } catch (err) {
-        console.error("Erreur inattendue", err)
-      } finally {
-        setLoading(false)
+        setProfile(data)
+        setIsBlocked({ expired, suspended })
       }
+      setLoading(false)
     }
-    
     fetchProfile()
   }, [id, supabase])
 
+  // --- FONCTION VCARD AMÉLIORÉE (INCLUT TOUS LES LIENS) ---
   const downloadVCard = () => {
     if (!profile) return
+
     const vCard = [
       'BEGIN:VCARD',
       'VERSION:3.0',
-      `FN;CHARSET=UTF-8:${profile.full_name || ''}`,
+      `FN;CHARSET=UTF-8:${profile.full_name}`,
       `ORG;CHARSET=UTF-8:${profile.company || ''}`,
       `TITLE;CHARSET=UTF-8:${profile.job_title || ''}`,
       `TEL;TYPE=CELL:${profile.phone || ''}`,
-      `TEL;TYPE=WORK:${profile.whatsapp || ''}`,
+      profile.phone_2 ? `TEL;TYPE=WORK:${profile.phone_2}` : '',
+      profile.phone_3 ? `TEL;TYPE=OTHER:${profile.phone_3}` : '',
       `EMAIL;TYPE=INTERNET:${profile.email_contact || ''}`,
-      `ADR;TYPE=WORK;CHARSET=UTF-8:;;${profile.address || ''};;;`,
-      `URL:${profile.website_url || ''}`,
+      profile.website_url ? `URL:${profile.website_url}` : '',
+      
+      // Ajout des réseaux sociaux dans la section NOTE pour compatibilité universelle
+      `NOTE;CHARSET=UTF-8:PROFIL DIGITAL\n` +
+      (profile.linkedin_url ? `URL: ${profile.linkedin_url}\n` : '') +
+      (profile.instagram_url ? `URL: ${profile.instagram_url}\n` : '') +
+      (profile.tiktok_url ? `URL: ${profile.tiktok_url}\n` : '') +
+      (profile.youtube_url ? `URL: ${profile.youtube_url}\n` : '') +
+      (profile.snapchat_url ? `URL: ${profile.snapchat_url}\n` : '') ,
+
+      // Champs techniques pour certains répertoires intelligents
+      profile.linkedin_url ? `X-SOCIALMSGR;TYPE=linkedin:${profile.linkedin_url}` : '',
+      profile.instagram_url ? `X-SOCIALMSGR;TYPE=instagram:${profile.instagram_url}` : '',
+      
       'END:VCARD'
-    ].join('\r\n')
+    ].filter(Boolean).join('\r\n')
 
     const blob = new Blob([vCard], { type: 'text/vcard;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `${profile.full_name || 'contact'}.vcf`)
+    link.download = `${profile.full_name.replace(/\s+/g, '_')}.vcf`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
   }
 
-  // --- 1. ÉTAT : CHARGEMENT ---
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  )
 
-  // --- 2. ÉTAT : SUSPENDU ---
-  if (isSuspended) {
+  if (!profile) return (
+    <div className="min-h-screen flex items-center justify-center font-bold text-slate-400 uppercase tracking-widest text-xs">
+      Profil introuvable
+    </div>
+  )
+
+  // --- ÉCRAN SI EXPIRÉ OU SUSPENDU ---
+  if (isBlocked.expired || isBlocked.suspended) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center font-sans">
-        <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-6 shadow-sm">
-          <Ban size={40} />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-[400px] bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 text-center">
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isBlocked.suspended ? 'bg-amber-50 text-amber-500' : 'bg-red-50 text-red-500'}`}>
+            {isBlocked.suspended ? <ShieldAlert size={40} /> : <Clock size={40} />}
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 mb-3 uppercase tracking-tight">
+            {isBlocked.suspended ? "Profil Suspendu" : "Lien Expiré"}
+          </h1>
+          <p className="text-slate-500 font-medium leading-relaxed mb-8 text-sm">
+            {isBlocked.suspended 
+              ? "Ce profil a été temporairement désactivé par l'administrateur." 
+              : "Cette carte de visite numérique n'est plus active car sa date de validité est dépassée."}
+          </p>
+          <div className="pt-6 border-t border-slate-50">
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Digital Card System</p>
+          </div>
         </div>
-        <h1 className="text-2xl font-black text-slate-800 tracking-tight">Profil indisponible</h1>
-        <p className="mt-3 text-slate-500 max-w-sm">
-          Cette carte de visite numérique a été suspendue ou n'est plus accessible pour le moment.
-        </p>
-        <div className="mt-10 py-6 border-t border-slate-200 w-full max-w-xs flex flex-col items-center gap-2">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Propulsé par</span>
-            <span className="text-xs font-bold text-slate-300">DimaCardApp</span>
-        </div>
       </div>
     )
   }
 
-  // --- 3. ÉTAT : INTROUVABLE ---
-  if (!profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-bold text-slate-500">
-        Ce profil n'existe pas.
-      </div>
-    )
-  }
-
-  // --- 4. ÉTAT : AFFICHAGE NORMAL DU PROFIL (Complet) ---
+  // --- AFFICHAGE NORMAL DU PROFIL ---
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex justify-center items-start text-slate-900 font-sans">
-      <div className="w-full max-w-md flex flex-col min-h-screen bg-white shadow-2xl">
+    <div className="min-h-screen bg-slate-100 flex justify-center items-start sm:py-10 font-sans">
+      <div className="w-full max-w-[420px] bg-white sm:rounded-[3rem] shadow-2xl flex flex-col min-h-screen sm:min-h-[850px] overflow-hidden">
         
-        {/* HEADER VISUEL */}
-        <div className="relative h-56 w-full">
-          <div className="absolute inset-0 bg-gradient-to-tr from-blue-700 to-indigo-900"></div>
-          <div className="absolute -bottom-12 w-full flex justify-center">
-            <div className="w-32 h-32 rounded-[2.5rem] bg-white p-1 shadow-2xl overflow-hidden ring-4 ring-white">
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover rounded-[2.2rem]" />
-              ) : (
-                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={50} /></div>
-              )}
+        {/* HEADER & IMAGE */}
+        <div className="relative h-44 bg-slate-900 shrink-0">
+          <div className="absolute inset-0 opacity-30 bg-gradient-to-tr from-blue-600 to-transparent"></div>
+          <div className="absolute -bottom-14 w-full flex justify-center">
+            <div className="relative">
+              <div className="w-28 h-28 rounded-[2rem] bg-white p-1 shadow-xl">
+                <div className="w-full h-full rounded-[1.8rem] overflow-hidden bg-slate-100">
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} className="w-full h-full object-cover" alt={profile.full_name} />
+                  ) : (
+                    <User size={40} className="w-full h-full p-6 text-slate-300" />
+                  )}
+                </div>
+              </div>
+              <div className="absolute bottom-0 right-0 bg-green-500 border-4 border-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg">
+                <ShieldCheck size={14} className="text-white" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* INFOS PRINCIPALES */}
-        <div className="mt-16 px-8 text-center">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">{profile.full_name}</h1>
-          <div className="mt-2 flex flex-col items-center gap-1">
-            <span className="text-blue-600 font-extrabold uppercase tracking-widest text-[11px] px-3 py-1 bg-blue-50 rounded-full">
-              {profile.job_title}
-            </span>
-            <div className="flex items-center gap-1.5 text-slate-500 font-medium text-sm mt-1">
-              <Building2 size={16} />
-              <span>{profile.company || 'Cardmesh'}</span>
-            </div>
-          </div>
-          
-          {profile.bio && (
-            <div className="mt-5 p-4 bg-slate-50 rounded-2xl text-slate-600 text-sm leading-relaxed text-left border border-slate-100 flex gap-3">
-              <AlignLeft size={20} className="text-slate-400 shrink-0 mt-0.5" />
-              <p>{profile.bio}</p>
-            </div>
-          )}
-        </div>
+        {/* INFOS CLIENT */}
+        <div className="mt-16 px-6 text-center flex-1 pb-10">
+          <h1 className="text-2xl font-black text-slate-900">{profile.full_name}</h1>
+          <p className="text-blue-600 font-bold text-xs uppercase mt-1 tracking-widest">{profile.job_title}</p>
+          <p className="text-slate-400 text-[10px] uppercase font-bold mt-1 tracking-wider">{profile.company}</p>
 
-        {/* BOUTON ENREGISTRER */}
-        <div className="px-6 mt-8">
-          <button onClick={downloadVCard} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all">
-            <Download size={22} /> Enregistrer le Contact
+          <button 
+            onClick={downloadVCard} 
+            className="w-full mt-6 bg-slate-900 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all"
+          >
+            <Download size={20} /> Enregistrer le Contact
           </button>
-        </div>
 
-        {/* COORDONNÉES ET CONTACTS */}
-        <div className="px-6 mt-10 space-y-6 pb-12">
-          
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Contact Direct</h3>
-
-          {/* Numéros en gros */}
-          <div className="space-y-3">
-            {profile.phone && (
-              <a href={`tel:${profile.phone}`} className="flex items-center gap-4 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl group transition-all">
-                <div className="w-12 h-12 flex items-center justify-center bg-white text-blue-600 rounded-xl shadow-sm"><Phone size={22} /></div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-blue-400 uppercase">Téléphone</span>
-                  <span className="text-lg font-black text-blue-900">{profile.phone}</span>
-                </div>
-              </a>
-            )}
-
+          {/* LISTE DES LIENS DYNAMIQUE */}
+          <div className="mt-8 space-y-3 text-left">
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-2">Coordonnées & Réseaux</p>
+            
+            {profile.phone && <SocialRow icon={<Phone size={18}/>} label="Téléphone Principal" value={profile.phone} href={`tel:${profile.phone}`} />}
+            {profile.phone_2 && <SocialRow icon={<Phone size={18}/>} label="Téléphone secondaire" value={profile.phone_2} href={`tel:${profile.phone_2}`} />}
+            {profile.phone_3 && <SocialRow icon={<Phone size={18}/>} label="Autre Ligne" value={profile.phone_3} href={`tel:${profile.phone_3}`} />}
+            
             {profile.whatsapp && (
-              <a href={`https://wa.me/${profile.whatsapp.replace(/\D/g,'')}`} className="flex items-center gap-4 p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl group transition-all">
-                <div className="w-12 h-12 flex items-center justify-center bg-white text-emerald-500 rounded-xl shadow-sm"><MessageCircle size={22} /></div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase">WhatsApp</span>
-                  <span className="text-lg font-black text-emerald-900">{profile.whatsapp}</span>
-                </div>
-              </a>
+              <SocialRow 
+                icon={<MessageCircle size={18}/>} 
+                label="WhatsApp" 
+                value="Démarrer une discussion" 
+                href={`https://wa.me/${profile.whatsapp.replace(/\D/g,'')}`} 
+                color="text-emerald-500" 
+                isExternal 
+              />
             )}
+            {profile.website_url && <SocialRow icon={<Globe size={18}/>} label="Site Web" value="Visiter le site" href={profile.website_url} isExternal />}
+            {profile.linkedin_url && <SocialRow icon={<Linkedin size={18}/>} label="LinkedIn" value="Profil Professionnel" href={profile.linkedin_url} isExternal color="text-blue-700" />}
+            {profile.instagram_url && <SocialRow icon={<Instagram size={18}/>} label="Instagram" value="Suivre les actualités" href={profile.instagram_url} isExternal color="text-pink-600" />}
+            {profile.tiktok_url && <SocialRow icon={<Video size={18}/>} label="TikTok" value="Voir les vidéos" href={profile.tiktok_url} isExternal color="text-black" />}
+            {profile.youtube_url && <SocialRow icon={<Youtube size={18}/>} label="YouTube" value="S'abonner à la chaîne" href={profile.youtube_url} isExternal color="text-red-600" />}
+            {profile.snapchat_url && <SocialRow icon={<Ghost size={18}/>} label="Snapchat" value="Ajouter le contact" href={profile.snapchat_url} isExternal color="text-yellow-500" />}
+            {profile.email_contact && <SocialRow icon={<Mail size={18}/>} label="Email" value={profile.email_contact} href={`mailto:${profile.email_contact}`} />}
+            
           </div>
-
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pt-4 ml-1">Informations Complémentaires</h3>
-          <div className="space-y-3">
-            {profile.email_contact && (
-              <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl">
-                <div className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl"><Mail size={20} /></div>
-                <div className="overflow-hidden">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Email</p>
-                  <p className="text-sm font-bold text-slate-700 truncate">{profile.email_contact}</p>
-                </div>
-              </div>
-            )}
-
-            {profile.address && (
-              <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl">
-                <div className="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl"><MapPin size={20} /></div>
-                <div className="overflow-hidden">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Adresse</p>
-                  <p className="text-sm font-bold text-slate-700">{profile.address}</p>
-                </div>
-              </div>
-            )}
-
-            {profile.website_url && (
-              <a href={profile.website_url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 transition-all">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-xl"><Globe size={20} /></div>
-                  <span className="text-sm font-bold text-slate-700">Site Internet</span>
-                </div>
-                <ChevronRight size={18} className="text-slate-300" />
-              </a>
-            )}
-
-            {profile.linkedin_url && (
-              <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 transition-all">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 flex items-center justify-center bg-[#0A66C2]/10 text-[#0A66C2] rounded-xl"><Linkedin size={20} /></div>
-                  <span className="text-sm font-bold text-slate-700">Profil LinkedIn</span>
-                </div>
-                <ChevronRight size={18} className="text-slate-300" />
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* FOOTER */}
-        <div className="py-12 flex flex-col items-center gap-3">
-          <div className="h-px w-12 bg-slate-200"></div>
-          <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">Cardmesh Digital</p>
         </div>
       </div>
     </div>
+  )
+}
+
+function SocialRow({ icon, label, value, href, isExternal, color = "text-slate-400" }: any) {
+  return (
+    <a 
+      href={href} 
+      target={isExternal ? "_blank" : "_self"} 
+      rel={isExternal ? "noopener noreferrer" : undefined}
+      className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all group shadow-sm"
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 flex items-center justify-center bg-slate-50 ${color} rounded-xl group-hover:scale-110 transition-transform`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">{label}</p>
+          <p className="text-sm font-bold text-slate-700 leading-none truncate max-w-[180px]">{value}</p>
+        </div>
+      </div>
+      <ChevronRight size={16} className="text-slate-300" />
+    </a>
   )
 }

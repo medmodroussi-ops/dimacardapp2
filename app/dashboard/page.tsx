@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { 
-  Upload, Loader2, Link as LinkIcon, Copy, ExternalLink, 
-  LogOut, Save, User as UserIcon, Briefcase, Phone, Globe, Plus, Trash2,
-  QrCode, X, Download // 🟢 Ajout des icônes nécessaires pour le QR Code
+  Upload, Loader2, Link as LinkIcon, Copy, LogOut, Save, User as UserIcon, 
+  Phone, Globe, QrCode, X, Download, Mail, Share2
 } from 'lucide-react'
-import { QRCodeCanvas } from 'qrcode.react' // 🟢 Importation de la librairie QR Code
+import { QRCodeCanvas } from 'qrcode.react'
 
 export default function Dashboard() {
   const supabase = createClient()
@@ -18,387 +17,157 @@ export default function Dashboard() {
   const [updating, setUpdating] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  
-  // 🟢 Nouvel état pour gérer l'affichage de la fenêtre du QR Code
   const [showQrModal, setShowQrModal] = useState(false)
   
   const [profile, setProfile] = useState({
-    full_name: '',
-    job_title: '',
-    company: '',
-    phone: '',
-    linkedin_url: '',
-    avatar_url: '',
-    email_contact: '', 
-    website_url: '',   
-    whatsapp: '',
-    custom_links: [] as { id: string, title: string, url: string }[]
+    full_name: '', job_title: '', company: '', avatar_url: '',
+    phone: '', phone_2: '', phone_3: '', whatsapp: '',
+    email_contact: '', website_url: '', linkedin_url: '',
+    instagram_url: '', facebook_url: '', twitter_url: '',
+    tiktok_url: '', youtube_url: '', snapchat_url: ''
   })
 
   useEffect(() => {
-    getProfile()
-  }, [])
-
-  async function getProfile() {
-    try {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUserId(user.id)
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`full_name, job_title, company, phone, linkedin_url, avatar_url, email_contact, website_url, whatsapp, custom_links`)
-        .eq('id', user.id)
-        .single()
-
-      if (data) {
-        const d = data as any;
-        setProfile({
-          full_name: d.full_name || '',
-          job_title: d.job_title || '',
-          company: d.company || '',
-          phone: d.phone || '',
-          linkedin_url: d.linkedin_url || '',
-          avatar_url: d.avatar_url || '',
-          email_contact: d.email_contact || '',
-          website_url: d.website_url || '',    
-          whatsapp: d.whatsapp || '',
-          custom_links: d.custom_links || [] 
-        })
-      }
-    } catch (error) {
-      console.error('Erreur:', error)
-    } finally {
-      setLoading(false)
+    async function getProfile() {
+      try {
+        setLoading(true)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/login'); return }
+        setUserId(user.id)
+        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+        if (data) setProfile(prev => ({ ...prev, ...data }))
+      } catch (error) { console.error(error) } finally { setLoading(false) }
     }
-  }
+    getProfile()
+  }, [router, supabase])
 
   const copyToClipboard = () => {
     if (userId) {
-      const url = `${window.location.origin}/p/${userId}`
-      navigator.clipboard.writeText(url)
-      alert('Lien public copié dans le presse-papier !')
+      navigator.clipboard.writeText(`${window.location.origin}/p/${userId}`)
+      alert("Lien copié !")
     }
   }
 
-  // 🟢 Fonction pour télécharger le QR Code du client
   const downloadQRCode = () => {
     const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement
     if (canvas) {
-      const pngUrl = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream')
-      let downloadLink = document.createElement('a')
-      downloadLink.href = pngUrl
-      downloadLink.download = `Mon_QRCode_${profile.full_name || 'Profil'}.png`
-      document.body.appendChild(downloadLink)
-      downloadLink.click()
-      document.body.removeChild(downloadLink)
+      const link = document.createElement('a')
+      link.href = canvas.toDataURL('image/png')
+      link.download = `QR_${profile.full_name || 'DimaCard'}.png`
+      link.click()
     }
-  }
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-  }
-
-  const addCustomLink = () => {
-    setProfile({
-      ...profile,
-      custom_links: [...profile.custom_links, { id: Date.now().toString(), title: '', url: '' }]
-    })
-  }
-
-  const updateCustomLink = (id: string, field: 'title' | 'url', value: string) => {
-    const updatedLinks = profile.custom_links.map(link => 
-      link.id === id ? { ...link, [field]: value } : link
-    )
-    setProfile({ ...profile, custom_links: updatedLinks })
-  }
-
-  const removeCustomLink = (id: string) => {
-    const updatedLinks = profile.custom_links.filter(link => link.id !== id)
-    setProfile({ ...profile, custom_links: updatedLinks })
   }
 
   async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploadingImage(true)
-      if (!event.target.files || event.target.files.length === 0) throw new Error('Vous devez sélectionner une image.')
-
-      const file = event.target.files[0]
-      const fileExt = file.name.split('.').pop()
-      const { data: { user } } = await supabase.auth.getUser()
-      const filePath = `${user?.id}.${fileExt}`
-
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true })
-      if (uploadError) throw uploadError
-
+      const file = event.target.files?.[0]
+      if (!file || !userId) return
+      const filePath = `${userId}/avatar-${Math.random()}.${file.name.split('.').pop()}`
+      await supabase.storage.from('avatars').upload(filePath, file)
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath)
-      setProfile({ ...profile, avatar_url: publicUrl })
-    } catch (error) {
-      alert('Erreur lors du téléchargement de l\'image.')
-    } finally {
-      setUploadingImage(false)
-    }
+      setProfile(prev => ({ ...prev, avatar_url: publicUrl }))
+    } finally { setUploadingImage(false) }
   }
 
   async function updateProfile(e: React.FormEvent) {
     e.preventDefault()
+    setUpdating(true)
     try {
-      setUpdating(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Aucun utilisateur connecté')
-
-      const updates = {
-        id: user.id,
-        ...profile,
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error } = await supabase.from('profiles').upsert(updates)
-      if (error) throw error
-      alert('Profil mis à jour avec succès !')
-    } catch (error) {
-      alert('Erreur lors de la mise à jour des données.')
-    } finally {
-      setUpdating(false)
-    }
+      await supabase.from('profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() })
+      alert('Profil mis à jour !')
+    } finally { setUpdating(false) }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
-        <p className="text-slate-500 font-medium">Chargement de votre espace...</p>
-      </div>
-    )
-  }
-
-  const publicUrl = userId && typeof window !== 'undefined' ? `${window.location.origin}/p/${userId}` : ''
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40} /></div>
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12">
-      
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center gap-2">
-              <div className="bg-blue-600 text-white p-1.5 rounded-lg">
-                <LinkIcon size={20} />
-              </div>
-              <span className="text-xl font-bold text-slate-900">DimaCardAPP</span>
-            </div>
-            <button onClick={handleSignOut} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-red-600 transition-colors">
-              <LogOut size={18} />
-              <span className="hidden sm:inline">Se déconnecter</span>
-            </button>
-          </div>
+    <div className="min-h-screen bg-[#F8FAFC] pb-20 font-sans">
+      <nav className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-40">
+        <div className="max-w-5xl mx-auto px-6 h-20 flex justify-between items-center">
+          <div className="flex items-center gap-2 font-black text-xl text-slate-900"><LinkIcon className="text-blue-600"/> DimaCard</div>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="text-slate-500 font-bold flex items-center gap-2 hover:text-red-500 transition-colors"><LogOut size={18}/> Quitter</button>
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 mt-8">
-        
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Mon Profil Digitale</h1>
-          <p className="text-slate-500 mt-2">Gérez les informations de votre carte de visite digitale.</p>
-        </div>
-        
-        {userId && (
-          <div className="mb-8 p-5 bg-white border border-blue-100 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-            <div className="flex items-center gap-4 overflow-hidden pl-2">
-              <div className="bg-blue-50 p-3 rounded-xl text-blue-600 shrink-0">
-                <LinkIcon size={24} />
-              </div>
-              <div className="truncate">
-                <p className="text-sm font-bold text-slate-900">Votre lien public</p>
-                <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate block flex items-center gap-1 mt-0.5">
-                  {publicUrl} <ExternalLink size={14} />
-                </a>
-              </div>
-            </div>
-            
-            {/* 🟢 Ajout du bouton QR Code à côté de Copier le lien */}
-            <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 shrink-0">
-              <button onClick={() => setShowQrModal(true)} className="w-full sm:w-auto bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
-                <QrCode size={16} /> Mon QR Code
-              </button>
-              <button onClick={copyToClipboard} className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
-                <Copy size={16} /> Copier le lien
-              </button>
-            </div>
+      <main className="max-w-3xl mx-auto px-4 mt-10">
+        {/* LIEN PUBLIC CORRIGÉ POUR MOBILE */}
+        <div className="bg-white rounded-[2rem] p-6 shadow-sm border mb-8 flex flex-col md:flex-row items-center gap-6 overflow-hidden">
+          <div className="flex-1 w-full min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Votre lien public</p>
+            <p className="text-slate-400 text-sm truncate block">{`${window.location.origin}/p/${userId}`}</p>
           </div>
-        )}
+          <div className="flex gap-2 w-full md:w-auto shrink-0">
+            <button onClick={() => setShowQrModal(true)} className="flex-1 md:flex-none bg-slate-900 text-white px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all text-sm whitespace-nowrap"><QrCode size={18}/> QR Code</button>
+            <button onClick={copyToClipboard} className="flex-1 md:flex-none bg-slate-100 text-slate-700 px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all text-sm whitespace-nowrap"><Copy size={18}/> Copier</button>
+          </div>
+        </div>
 
         <form onSubmit={updateProfile} className="space-y-6">
-          
-          {/* BLOC 1 : Photo */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <UserIcon className="text-blue-600" size={20} /> Photo de profil
-            </h2>
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="h-28 w-28 shrink-0 overflow-hidden rounded-full bg-slate-100 border-4 border-white shadow-md relative group">
-                {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-slate-300"><UserIcon size={40} /></div>
-                )}
-                {uploadingImage && <div className="absolute inset-0 bg-white/70 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={24} /></div>}
-              </div>
-              <div className="text-center sm:text-left">
-                <label className="cursor-pointer bg-blue-50 hover:bg-blue-100 text-blue-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors inline-flex items-center gap-2">
-                  <Upload size={16} /> Changer l'image
-                  <input type="file" className="hidden" accept="image/*" onChange={uploadAvatar} disabled={uploadingImage} />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* BLOC 2 : Infos Générales */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Briefcase className="text-blue-600" size={20} /> Informations générales
-            </h2>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nom et Prénom</label>
-                <input type="text" value={profile.full_name} onChange={(e) => setProfile({...profile, full_name: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Poste / Fonction</label>
-                <input type="text" value={profile.job_title} onChange={(e) => setProfile({...profile, job_title: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Entreprise</label>
-                <input type="text" value={profile.company} onChange={(e) => setProfile({...profile, company: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-            </div>
-          </div>
-
-          {/* BLOC 3 : Coordonnées et Base */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Phone className="text-blue-600" size={20} /> Contacts standards
-            </h2>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Téléphone Mobile</label>
-                <input type="tel" value={profile.phone} onChange={(e) => setProfile({...profile, phone: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Numéro WhatsApp</label>
-                <input type="tel" value={profile.whatsapp} onChange={(e) => setProfile({...profile, whatsapp: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email </label>
-                <input type="email" value={profile.email_contact} onChange={(e) => setProfile({...profile, email_contact: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Site Web</label>
-                <input type="url" value={profile.website_url} onChange={(e) => setProfile({...profile, website_url: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Profil LinkedIn</label>
-                <input type="url" value={profile.linkedin_url} onChange={(e) => setProfile({...profile, linkedin_url: e.target.value})} className="block w-full rounded-xl border-slate-200 bg-slate-50 border px-4 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
-              </div>
-            </div>
-          </div>
-
-          {/* BLOC 4 : Liens Personnalisés Dynamiques */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
-              <Globe className="text-blue-600" size={20} /> Liens additionnels
-            </h2>
-            <p className="text-sm text-slate-500 mb-6">Ajoutez d'autres liens spécifiques (Portfolio, Instagram, Calendly, Menu de restaurant...)</p>
-            
-            <div className="space-y-4 mb-6">
-              {profile.custom_links.map((link) => (
-                <div key={link.id} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <div className="w-full sm:w-1/3">
-                    <input 
-                      type="text" 
-                      placeholder="Titre (ex: Mon Instagram)" 
-                      value={link.title} 
-                      onChange={(e) => updateCustomLink(link.id, 'title', e.target.value)}
-                      className="block w-full rounded-lg border-slate-200 bg-white border px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none" 
-                    />
-                  </div>
-                  <div className="w-full sm:w-flex-1 flex-1">
-                    <input 
-                      type="url" 
-                      placeholder="URL (ex: https://instagram.com/...)" 
-                      value={link.url} 
-                      onChange={(e) => updateCustomLink(link.id, 'url', e.target.value)}
-                      className="block w-full rounded-lg border-slate-200 bg-white border px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none" 
-                    />
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => removeCustomLink(link.id)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Supprimer ce lien"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+          <section className="bg-white rounded-[2rem] p-8 shadow-sm border">
+            <h2 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-900"><UserIcon size={20} className="text-blue-600"/> Identité</h2>
+            <div className="flex flex-col md:flex-row gap-8 mb-8 items-center">
+              <div className="relative">
+                <div className="w-28 h-28 rounded-[2rem] overflow-hidden bg-slate-100 border-4 border-slate-50">
+                  {profile.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full p-6 text-slate-300" />}
+                  {uploadingImage && <div className="absolute inset-0 bg-white/60 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>}
                 </div>
-              ))}
+                <label className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-lg cursor-pointer shadow-lg hover:scale-110 transition-transform"><Upload size={16}/><input type="file" className="hidden" accept="image/*" onChange={uploadAvatar} /></label>
+              </div>
+              <div className="grid grid-cols-1 gap-4 flex-1 w-full">
+                <InputGroup label="Nom complet" value={profile.full_name} onChange={(v) => setProfile({...profile, full_name: v})} />
+                <InputGroup label="Poste actuel" value={profile.job_title} onChange={(v) => setProfile({...profile, job_title: v})} />
+              </div>
             </div>
+            <InputGroup label="Entreprise" value={profile.company} onChange={(v) => setProfile({...profile, company: v})} />
+          </section>
 
-            <button 
-              type="button" 
-              onClick={addCustomLink}
-              className="w-full border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-xl py-3 flex items-center justify-center gap-2 font-medium transition-colors"
-            >
-              <Plus size={18} /> Ajouter un nouveau lien
-            </button>
-          </div>
+          <section className="bg-white rounded-[2rem] p-8 shadow-sm border">
+            <h2 className="text-lg font-black mb-6 flex items-center gap-2 text-slate-900"><Share2 size={20} className="text-indigo-600"/> Contacts & Réseaux</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputGroup label="Téléphone Principal" value={profile.phone} onChange={(v) => setProfile({...profile, phone: v})} />
+              <InputGroup label="Téléphone 2" value={profile.phone_2} onChange={(v) => setProfile({...profile, phone_2: v})} />
+              <InputGroup label="Téléphone 3" value={profile.phone_3} onChange={(v) => setProfile({...profile, phone_3: v})} />
+              <InputGroup label="WhatsApp" value={profile.whatsapp} onChange={(v) => setProfile({...profile, whatsapp: v})} />
+              <InputGroup label="Email Contact" value={profile.email_contact} onChange={(v) => setProfile({...profile, email_contact: v})} />
+              <InputGroup label="LinkedIn" value={profile.linkedin_url} onChange={(v) => setProfile({...profile, linkedin_url: v})} />
+              <InputGroup label="Instagram" value={profile.instagram_url} onChange={(v) => setProfile({...profile, instagram_url: v})} />
+              <InputGroup label="Facebook" value={profile.facebook_url} onChange={(v) => setProfile({...profile, facebook_url: v})} />
+              <InputGroup label="TikTok" value={profile.tiktok_url} onChange={(v) => setProfile({...profile, tiktok_url: v})} />
+              <InputGroup label="Twitter / X" value={profile.twitter_url} onChange={(v) => setProfile({...profile, twitter_url: v})} />
+              <InputGroup label="YouTube" value={profile.youtube_url} onChange={(v) => setProfile({...profile, youtube_url: v})} />
+              <InputGroup label="Snapchat" value={profile.snapchat_url} onChange={(v) => setProfile({...profile, snapchat_url: v})} />
+              <div className="md:col-span-2"><InputGroup label="Site Web" value={profile.website_url} onChange={(v) => setProfile({...profile, website_url: v})} /></div>
+            </div>
+          </section>
 
-          <div className="pt-6 pb-12 flex justify-end">
-            <button type="submit" disabled={updating} className="w-full sm:w-auto bg-blue-600 text-white px-8 py-3.5 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 hover:shadow-blue-300 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-              {updating ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-              {updating ? 'Enregistrement en cours...' : 'Enregistrer les modifications'}
-            </button>
-          </div>
-
+          <button type="submit" disabled={updating} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50">
+            {updating ? <Loader2 className="animate-spin" size={24}/> : <Save size={24}/>} Enregistrer
+          </button>
         </form>
       </main>
 
-      {/* 🟢 MODAL QR CODE DU CLIENT */}
-      {showQrModal && userId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-[2rem] w-full max-w-sm shadow-2xl overflow-hidden p-8 text-center relative">
-            <button onClick={() => setShowQrModal(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-all">
-              <X size={20} />
-            </button>
-            
-            <h2 className="text-xl font-black text-slate-900 mb-1">Mon QR Code</h2>
-            <p className="text-sm text-slate-500 mb-8">Scannez pour voir votre carte de visite</p>
-
-            <div className="flex justify-center bg-slate-50 p-6 rounded-3xl border border-slate-100 inline-block mx-auto mb-8">
-              <QRCodeCanvas 
-                id="qr-canvas"
-                value={`${window.location.origin}/p/${userId}`} 
-                size={200}
-                bgColor={"#ffffff"}
-                fgColor={"#0f172a"}
-                level={"H"}
-                includeMargin={false}
-              />
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white p-8 rounded-[2.5rem] max-w-sm w-full text-center relative shadow-2xl animate-in zoom-in duration-200">
+            <button onClick={() => setShowQrModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-900"><X size={24}/></button>
+            <h2 className="text-xl font-black mb-6">Votre QR Code</h2>
+            <div className="bg-slate-50 p-6 rounded-3xl inline-block mb-6 shadow-inner">
+              <QRCodeCanvas id="qr-canvas" value={`${window.location.origin}/p/${userId}`} size={200} level="H" includeMargin={true} />
             </div>
-
-            <button onClick={downloadQRCode} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-indigo-200">
-              <Download size={20} /> Télécharger l'image PNG
-            </button>
+            <button onClick={downloadQRCode} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all"><Download size={18}/> Télécharger l'image</button>
           </div>
         </div>
       )}
+    </div>
+  )
+}
 
+function InputGroup({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-col gap-1 w-full text-left">
+      <label className="text-[10px] font-black uppercase text-slate-400 ml-1">{label}</label>
+      <input type="text" value={value || ''} onChange={(e) => onChange(e.target.value)} className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl font-bold text-sm outline-none focus:border-blue-300 focus:bg-white transition-all text-slate-700" placeholder="..." />
     </div>
   )
 }
