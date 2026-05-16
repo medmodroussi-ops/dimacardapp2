@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Loader2, Mail, Lock, LogIn } from 'lucide-react'
+import { Loader2, Mail, Lock, LogIn, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -52,30 +52,52 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
-          <LogIn size={32} />
+    <div className="min-h-screen bg-[#0B0F19] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
+      
+      {/* Effets de lumière en arrière-plan (Glows) */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#8B5CF6]/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#F5A623]/10 blur-[120px] rounded-full pointer-events-none" />
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center relative z-10">
+        <div className="w-20 h-20 bg-[#111827] rounded-[1.5rem] border border-white/10 flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(245,166,35,0.15)] relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-tr from-[#F5A623]/10 to-transparent pointer-events-none" />
+          {/* Logo DimaCard ou Icône */}
+          <img 
+            src="/dimacardlogo.jpeg" 
+            alt="DimaCard Logo" 
+            className="w-full h-full object-contain relative z-10 rounded-[1.5rem]" 
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              // Si l'image ne charge pas, on affiche l'icône de secours
+              e.currentTarget.parentElement?.querySelector('svg')?.classList.remove('hidden');
+            }} 
+          />
+          <LogIn size={32} className="text-[#F5A623] relative z-10 hidden" />
         </div>
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Connexion</h2>
-        <p className="mt-2 text-sm text-slate-500 font-medium">Accédez à votre espace DimaCardAPP</p>
+        <h2 className="text-3xl font-black text-white tracking-tight" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>Connexion</h2>
+        <p className="mt-2 text-sm text-[#9CA3AF] font-medium tracking-wide">Accédez à votre espace <span className="text-[#F5A623] font-bold">DimaCard</span></p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-xl shadow-slate-200/50 sm:rounded-3xl sm:px-10 border border-slate-100">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+        <div className="bg-[#111827] py-8 px-6 shadow-2xl shadow-black/50 sm:rounded-[2.5rem] sm:px-10 border border-white/5 relative overflow-hidden">
           
-          <form className="space-y-6" onSubmit={handleLogin}>
+          {/* Lueur interne de la carte */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#F5A623]/5 blur-[50px] rounded-full pointer-events-none" />
+          
+          <form className="space-y-6 relative z-10" onSubmit={handleLogin}>
             
+            {/* Message d'Erreur */}
             {errorMsg && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-bold text-center">
-                {errorMsg}
+              <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl text-red-400 text-sm font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                <AlertCircle size={18} className="shrink-0" />
+                <span>{errorMsg}</span>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Adresse Email</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2 ml-1">Adresse Email</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#9CA3AF]">
                   <Mail size={18} />
                 </div>
                 <input
@@ -83,16 +105,16 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                  className="block w-full pl-11 pr-4 py-3.5 bg-[#0B0F19] border border-white/10 rounded-xl text-white font-medium focus:bg-[#1F2937] focus:border-[#F5A623] outline-none transition-all placeholder:text-gray-600 shadow-inner"
                   placeholder="exemple@email.com"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Mot de passe</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2 ml-1">Mot de passe</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#9CA3AF]">
                   <Lock size={18} />
                 </div>
                 <input
@@ -100,7 +122,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
+                  className="block w-full pl-11 pr-4 py-3.5 bg-[#0B0F19] border border-white/10 rounded-xl text-white font-medium focus:bg-[#1F2937] focus:border-[#F5A623] outline-none transition-all placeholder:text-gray-600 shadow-inner"
                   placeholder="••••••••"
                 />
               </div>
@@ -109,9 +131,9 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+              className="w-full flex justify-center items-center gap-2 py-4 px-4 border border-transparent rounded-2xl shadow-lg shadow-[#F5A623]/20 text-sm font-black text-[#0B0F19] bg-[#F5A623] hover:bg-[#FDE047] focus:outline-none active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed transition-all uppercase tracking-wide mt-2"
             >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+              {loading ? <Loader2 className="animate-spin text-[#0B0F19]" size={20} /> : <LogIn size={20} className="text-[#0B0F19]" />}
               {loading ? 'Connexion en cours...' : 'Se connecter'}
             </button>
           </form>

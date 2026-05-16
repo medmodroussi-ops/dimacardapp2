@@ -76,17 +76,17 @@ export default function PublicProfile() {
 
   // --- BRANDING: ÉCRAN DE CHARGEMENT ---
   if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0F19]">
       <div className="relative">
-        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute inset-0 bg-[#F5A623]/20 rounded-full blur-xl animate-pulse"></div>
         <img 
           src="/dimacardlogo.jpeg" 
           alt="DimaCard Loading" 
           className="w-20 h-20 object-contain relative z-10 animate-bounce" 
         />
       </div>
-      <div className="mt-8 w-40 h-1 bg-slate-100 rounded-full overflow-hidden">
-        <div className="h-full bg-blue-600 rounded-full animate-progress"></div>
+      <div className="mt-8 w-40 h-1 bg-[#1F2937] rounded-full overflow-hidden">
+        <div className="h-full bg-[#F5A623] rounded-full animate-progress"></div>
       </div>
       <style jsx>{`
         @keyframes progress {
@@ -101,32 +101,32 @@ export default function PublicProfile() {
   )
 
   if (!profile) return (
-    <div className="min-h-screen flex items-center justify-center font-bold text-slate-400 uppercase tracking-widest text-xs">
+    <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center font-bold text-[#9CA3AF] uppercase tracking-widest text-xs">
       Profil introuvable
     </div>
   )
 
   if (isBlocked.expired || isBlocked.suspended) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
-        <div className="w-full max-w-[400px] bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 text-center">
-          {/* Logo Branding en haut */}
+      <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center p-6 font-sans relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-[#8B5CF6]/5 blur-[100px] rounded-full pointer-events-none" />
+        <div className="w-full max-w-[400px] bg-[#111827] p-10 rounded-[3rem] shadow-2xl border border-white/5 text-center relative z-10">
           <div className="mb-6 flex justify-center">
-             <img src="/dimacardlogo.jpeg" alt="DimaCard" className="h-8 w-auto grayscale opacity-40" />
+             <img src="/dimacardlogo.jpeg" alt="DimaCard" className="h-8 w-auto grayscale opacity-30" />
           </div>
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isBlocked.suspended ? 'bg-amber-50 text-amber-500' : 'bg-red-50 text-red-500'}`}>
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isBlocked.suspended ? 'bg-[#F5A623]/10 text-[#F5A623] border border-[#F5A623]/20' : 'bg-red-900/20 text-red-500 border border-red-500/20'}`}>
             {isBlocked.suspended ? <ShieldAlert size={40} /> : <Clock size={40} />}
           </div>
-          <h1 className="text-2xl font-black text-slate-900 mb-3 uppercase tracking-tight">
+          <h1 className="text-2xl font-black text-white mb-3 uppercase tracking-tight" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>
             {isBlocked.suspended ? "Profil Suspendu" : "Lien Expiré"}
           </h1>
-          <p className="text-slate-500 font-medium leading-relaxed mb-8 text-sm">
+          <p className="text-[#9CA3AF] font-medium leading-relaxed mb-8 text-sm">
             {isBlocked.suspended 
               ? "Ce profil a été temporairement désactivé par l'administrateur." 
               : "Cette carte de visite numérique n'est plus active car sa date de validité est dépassée."}
           </p>
-          <div className="pt-6 border-t border-slate-50">
-            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">DimaCard System</p>
+          <div className="pt-6 border-t border-white/5">
+            <p className="text-[10px] font-black text-[#4B5563] uppercase tracking-[0.2em]">DimaCard System</p>
           </div>
         </div>
       </div>
@@ -134,51 +134,56 @@ export default function PublicProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex justify-center items-start sm:py-10 font-sans">
-      <div className="w-full max-w-[420px] bg-white sm:rounded-[3rem] shadow-2xl flex flex-col min-h-screen sm:min-h-[850px] overflow-hidden relative">
+    <div className="min-h-screen bg-[#0B0F19] flex justify-center items-start sm:py-10 font-sans relative overflow-hidden">
+      
+      {/* Effets de lumière en arrière-plan */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#8B5CF6]/10 blur-[120px] rounded-full pointer-events-none hidden sm:block" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#F5A623]/10 blur-[120px] rounded-full pointer-events-none hidden sm:block" />
+
+      <div className="w-full max-w-[420px] bg-[#111827] sm:rounded-[3rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] sm:border sm:border-white/5 flex flex-col min-h-screen sm:min-h-[850px] overflow-hidden relative z-10">
         
         {/* HEADER & IMAGE AVEC FILIGRANE BRANDING */}
-        <div className="relative h-55 bg-slate-900 shrink-0 overflow-hidden">
-          <div className="absolute inset-0 opacity-30 bg-gradient-to-tr from-blue-600 to-transparent"></div>
+        <div className="relative h-55 bg-[#0B0F19] shrink-0 overflow-hidden border-b border-white/5">
+          <div className="absolute inset-0 opacity-40 bg-gradient-to-tr from-[#8B5CF6]/40 via-transparent to-[#F5A623]/20"></div>
           
           {/* Petit logo en haut à gauche pour le branding */}
-          <div className="absolute top-7 left-6 opacity-10">
-          <img src="/dimacardlogo.jpeg" alt="DimaCard" className="h-15 w-auto " />
+          <div className="absolute top-7 left-6 opacity-20">
+            <img src="/dimacardlogo.jpeg" alt="DimaCard" className="h-15 w-auto" />
           </div>
 
           <div className="absolute -bottom-1 w-full flex justify-center">
             <div className="relative">
-              <div className="w-32 h-45 rounded-[2.5rem] bg-white p-1.5 shadow-2x1">
-                <div className="w-full h-full rounded-[2.2rem] overflow-hidden bg-slate-50 flex items-center justify-center">
+              <div className="w-32 h-45 rounded-[2.5rem] bg-[#111827] p-1.5 shadow-2xl border border-white/10">
+                <div className="w-full h-full rounded-[2.2rem] overflow-hidden bg-[#1F2937] flex items-center justify-center">
                   {profile.avatar_url ? (
                     <img src={profile.avatar_url} className="w-full h-full object-cover aspect-square" alt={profile.full_name} />
                   ) : (
-                    <User size={45} className="text-slate-300" />
+                    <User size={45} className="text-[#4B5563]" />
                   )}
                 </div>
               </div>
-              <div className="absolute bottom-1 right-1 bg-green-500 border-[3px] border-white w-9 h-9 rounded-full flex items-center justify-center shadow-lg z-10">
-                <ShieldCheck size={16} className="text-white" />
+              <div className="absolute bottom-1 right-1 bg-[#F5A623] border-[3px] border-[#111827] w-9 h-9 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(245,166,35,0.4)] z-10">
+                <ShieldCheck size={16} className="text-[#0B0F19]" />
               </div>
             </div>
           </div>
         </div>
 
         {/* CONTENU DU PROFIL */}
-        <div className="mt-5 px-6 text-center flex-1 pb-10">
-          <h1 className="text-2xl font-black text-slate-900">{profile.full_name}</h1>
-          <p className="text-blue-600 font-bold text-xs uppercase mt-1 tracking-widest">{profile.job_title}</p>
-          <p className="text-slate-400 text-[10px] uppercase font-bold mt-1 tracking-wider">{profile.company}</p>
+        <div className="mt-6 px-6 text-center flex-1 pb-10">
+          <h1 className="text-2xl font-black text-white" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>{profile.full_name}</h1>
+          <p className="text-[#F5A623] font-bold text-xs uppercase mt-1.5 tracking-widest">{profile.job_title}</p>
+          <p className="text-[#9CA3AF] text-[10px] uppercase font-bold mt-1 tracking-wider">{profile.company}</p>
 
           <button 
             onClick={downloadVCard} 
-            className="w-full mt-4 bg-slate-900 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all"
+            className="w-full mt-6 bg-[#F5A623] text-[#0B0F19] py-4 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-[#F5A623]/20 hover:bg-[#FDE047] active:scale-95 transition-all"
           >
             <Download size={20} /> Enregistrer le Contact
           </button>
 
-          <div className="mt-8 space-y-3 text-left">
-            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-2">Coordonnées & Réseaux</p>
+          <div className="mt-10 space-y-3 text-left">
+            <p className="text-[10px] font-black text-[#4B5563] uppercase tracking-widest ml-2 mb-4">Coordonnées & Réseaux</p>
             
             {profile.phone && <SocialRow icon={<Phone size={18}/>} label="Téléphone Principal" value={profile.phone} href={`tel:${profile.phone}`} />}
             {profile.phone_2 && <SocialRow icon={<Phone size={18}/>} label="Téléphone secondaire" value={profile.phone_2} href={`tel:${profile.phone_2}`} />}
@@ -190,23 +195,23 @@ export default function PublicProfile() {
                 label="WhatsApp" 
                 value="Démarrer une discussion" 
                 href={`https://wa.me/${profile.whatsapp.replace(/\D/g,'')}`} 
-                color="text-emerald-500" 
+                color="text-emerald-400" 
                 isExternal 
               />
             )}
             {profile.website_url && <SocialRow icon={<Globe size={18}/>} label="Site Web" value="Visiter le site" href={profile.website_url} isExternal />}
-            {profile.linkedin_url && <SocialRow icon={<Linkedin size={18}/>} label="LinkedIn" value="Profil Professionnel" href={profile.linkedin_url} isExternal color="text-blue-700" />}
-            {profile.instagram_url && <SocialRow icon={<Instagram size={18}/>} label="Instagram" value="Suivre les actualités" href={profile.instagram_url} isExternal color="text-pink-600" />}
-            {profile.tiktok_url && <SocialRow icon={<Video size={18}/>} label="TikTok" value="Voir les vidéos" href={profile.tiktok_url} isExternal color="text-black" />}
-            {profile.youtube_url && <SocialRow icon={<Youtube size={18}/>} label="YouTube" value="S'abonner" href={profile.youtube_url} isExternal color="text-red-600" />}
-            {profile.snapchat_url && <SocialRow icon={<Ghost size={18}/>} label="Snapchat" value="Ajouter" href={profile.snapchat_url} isExternal color="text-yellow-500" />}
+            {profile.linkedin_url && <SocialRow icon={<Linkedin size={18}/>} label="LinkedIn" value="Profil Professionnel" href={profile.linkedin_url} isExternal color="text-[#0A66C2]" />}
+            {profile.instagram_url && <SocialRow icon={<Instagram size={18}/>} label="Instagram" value="Suivre les actualités" href={profile.instagram_url} isExternal color="text-[#E1306C]" />}
+            {profile.tiktok_url && <SocialRow icon={<Video size={18}/>} label="TikTok" value="Voir les vidéos" href={profile.tiktok_url} isExternal color="text-white" />}
+            {profile.youtube_url && <SocialRow icon={<Youtube size={18}/>} label="YouTube" value="S'abonner" href={profile.youtube_url} isExternal color="text-[#FF0000]" />}
+            {profile.snapchat_url && <SocialRow icon={<Ghost size={18}/>} label="Snapchat" value="Ajouter" href={profile.snapchat_url} isExternal color="text-[#FFFC00]" />}
             {profile.email_contact && <SocialRow icon={<Mail size={18}/>} label="Email" value={profile.email_contact} href={`mailto:${profile.email_contact}`} />}
           </div>
 
           {/* FOOTER BRANDING DIMACARD */}
-          <div className="mt-10 flex flex-col items-center gap-2 pb-1 opacity-100">
-             <img src="/dimacardlogo.jpeg" alt="DimaCard" className="h-15 w-auto " />
-             
+          <div className="mt-12 flex flex-col items-center gap-2 pb-2">
+             <img src="/dimacardlogo.jpeg" alt="DimaCard" className="h-10 w-auto opacity-50 grayscale hover:grayscale-0 transition-all duration-300" />
+             <p className="text-[9px] text-[#4B5563] tracking-widest uppercase font-bold">Smart Business Card</p>
           </div>
         </div>
       </div>
@@ -214,24 +219,24 @@ export default function PublicProfile() {
   )
 }
 
-function SocialRow({ icon, label, value, href, isExternal, color = "text-slate-400" }: any) {
+function SocialRow({ icon, label, value, href, isExternal, color = "text-[#9CA3AF]" }: any) {
   return (
     <a 
       href={href} 
       target={isExternal ? "_blank" : "_self"} 
       rel={isExternal ? "noopener noreferrer" : undefined}
-      className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all group shadow-sm"
+      className="flex items-center justify-between p-4 bg-[#1F2937] border border-white/5 rounded-2xl hover:bg-white/5 hover:border-white/10 transition-all group shadow-sm"
     >
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 flex items-center justify-center bg-slate-50 ${color} rounded-xl group-hover:scale-110 transition-transform`}>
+      <div className="flex items-center gap-4">
+        <div className={`w-10 h-10 flex items-center justify-center bg-[#0B0F19] ${color} rounded-xl group-hover:scale-110 shadow-inner transition-transform`}>
           {icon}
         </div>
         <div>
-          <p className="text-[9px] font-bold text-slate-400 uppercase leading-none mb-1">{label}</p>
-          <p className="text-sm font-bold text-slate-700 leading-none truncate max-w-[180px]">{value}</p>
+          <p className="text-[9px] font-bold text-[#9CA3AF] uppercase leading-none mb-1.5 tracking-wider">{label}</p>
+          <p className="text-sm font-bold text-white leading-none truncate max-w-[180px]">{value}</p>
         </div>
       </div>
-      <ChevronRight size={16} className="text-slate-300" />
+      <ChevronRight size={16} className="text-[#4B5563] group-hover:text-[#F5A623] transition-colors" />
     </a>
   )
 }
