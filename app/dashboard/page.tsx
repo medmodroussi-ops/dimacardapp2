@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { 
   Upload, Loader2, Link as LinkIcon, Copy, LogOut, Save, User as UserIcon, 
-  Phone, Globe, QrCode, X, Download, Mail, Share2
+  Phone, Globe, QrCode, X, Download, Mail, Share2, BarChart3, Eye
 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 
@@ -24,7 +24,8 @@ export default function Dashboard() {
     phone: '', phone_2: '', phone_3: '', whatsapp: '',
     email_contact: '', website_url: '', linkedin_url: '',
     instagram_url: '', facebook_url: '', twitter_url: '',
-    tiktok_url: '', youtube_url: '', snapchat_url: ''
+    tiktok_url: '', youtube_url: '', snapchat_url: '',
+    scan_count: 0 // <-- Ajout de la statistique dans l'état initial
   })
 
   useEffect(() => {
@@ -73,8 +74,12 @@ export default function Dashboard() {
   async function updateProfile(e: React.FormEvent) {
     e.preventDefault()
     setUpdating(true)
+    
+    // Extraction pour ne pas envoyer scan_count lors de la mise à jour manuelle du profil
+    const { scan_count, ...profileToUpdate } = profile
+
     try {
-      await supabase.from('profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() })
+      await supabase.from('profiles').upsert({ id: userId, ...profileToUpdate, updated_at: new Date().toISOString() })
       alert('Profil mis à jour !')
     } finally { setUpdating(false) }
   }
@@ -130,7 +135,7 @@ export default function Dashboard() {
 
       <main className="max-w-3xl mx-auto px-4 mt-10 relative z-10">
         {/* LIEN PUBLIC */}
-        <div className="bg-[#111827] rounded-[2rem] p-6 shadow-xl border border-white/5 mb-8 flex flex-col md:flex-row items-center gap-6 overflow-hidden">
+        <div className="bg-[#111827] rounded-[2rem] p-6 shadow-xl border border-white/5 mb-6 flex flex-col md:flex-row items-center gap-6 overflow-hidden">
           <div className="flex-1 w-full min-w-0">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#F5A623]">Votre lien public</p>
             <p className="text-[#9CA3AF] text-sm truncate block mt-1">{`${window.location.origin}/p/${userId}`}</p>
@@ -140,6 +145,36 @@ export default function Dashboard() {
             <button type="button" onClick={copyToClipboard} className="flex-1 md:flex-none bg-[#1F2937] text-white border border-white/10 px-5 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-all text-sm whitespace-nowrap"><Copy size={18}/> Copier</button>
           </div>
         </div>
+
+        {/* SECTION STATISTIQUES (NOUVEAU) */}
+        <section className="bg-[#111827] rounded-[2rem] p-6 shadow-xl border border-white/5 mb-8">
+          <h2 className="text-sm font-black mb-4 flex items-center gap-2 text-white uppercase tracking-wider" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>
+            <BarChart3 size={18} className="text-[#3B82F6]"/> Statistiques d'utilisation
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-[#0B0F19] border border-white/5 p-5 rounded-2xl flex items-center gap-4 relative overflow-hidden group">
+              <div className="absolute -right-4 -bottom-4 text-white/[0.02] group-hover:scale-110 transition-transform duration-300">
+                <Eye size={100} />
+              </div>
+              <div className="p-3 bg-[#3B82F6]/10 rounded-xl text-[#3B82F6]">
+                <Eye size={24} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-[#9CA3AF]">Nombre de Scans / Visites</p>
+                <p className="text-3xl font-black text-white mt-1">
+                  {profile.scan_count?.toLocaleString() || 0}
+                </p>
+              </div>
+            </div>
+
+            {/* Note d'information ou deuxième stat future */}
+            <div className="bg-[#0B0F19]/40 border border-dashed border-white/10 p-5 rounded-2xl flex flex-col justify-center text-left">
+              <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                Le compteur augmente en temps réel à chaque fois que votre <span className="text-[#F5A623] font-bold">DimaCard</span> ou votre lien public est scanné.
+              </p>
+            </div>
+          </div>
+        </section>
 
         <form onSubmit={updateProfile} className="space-y-6">
           <section className="bg-[#111827] rounded-[2rem] p-8 shadow-xl border border-white/5">
