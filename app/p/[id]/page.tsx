@@ -19,22 +19,35 @@ export default function PublicProfile() {
   const [isBlocked, setIsBlocked] = useState({ expired: false, suspended: false })
 
   useEffect(() => {
-    async function fetchProfile() {
-      const { data } = await supabase.from('profiles').select('*').eq('id', id).single()
-      
-      if (data) {
-        const today = new Date()
-        const expirationDate = data.expiration_date ? new Date(data.expiration_date) : null
+    async function fetchProfileAndIncrement() {
+      try {
+        const { data } = await supabase.from('profiles').select('*').eq('id', id).single()
         
-        const expired = expirationDate ? expirationDate < today : false
-        const suspended = data.status === 'suspendu'
+        if (data) {
+          const today = new Date()
+          const expirationDate = data.expiration_date ? new Date(data.expiration_date) : null
+          
+          const expired = expirationDate ? expirationDate < today : false
+          const suspended = data.status === 'suspendu'
 
-        setProfile(data)
-        setIsBlocked({ expired, suspended })
+          setProfile(data)
+          setIsBlocked({ expired, suspended })
+
+          // On incrémente le scan uniquement si la carte est active et valide
+          if (!expired && !suspended) {
+            await supabase.rpc('increment_scan_count', { target_profile_id: id })
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de la récupération ou de l'incrémentation :", error)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
-    fetchProfile()
+    
+    if (id) {
+      fetchProfileAndIncrement()
+    }
   }, [id, supabase])
 
   const downloadVCard = () => {
