@@ -19,13 +19,14 @@ export default function Dashboard() {
   const [userId, setUserId] = useState<string | null>(null)
   const [showQrModal, setShowQrModal] = useState(false)
   
+  // État initial avec TOUS les champs (incluant GitHub)
   const [profile, setProfile] = useState({
     full_name: '', job_title: '', company: '', avatar_url: '',
     phone: '', phone_2: '', phone_3: '', whatsapp: '',
     email_contact: '', website_url: '', linkedin_url: '',
     instagram_url: '', facebook_url: '', twitter_url: '',
-    tiktok_url: '', youtube_url: '', snapchat_url: '',
-    scan_count: 0 // <-- Ajout de la statistique dans l'état initial
+    tiktok_url: '', youtube_url: '', snapchat_url: '', github_url: '',
+    scan_count: 0
   })
 
   useEffect(() => {
@@ -34,10 +35,27 @@ export default function Dashboard() {
         setLoading(true)
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { router.push('/login'); return }
+        
         setUserId(user.id)
-        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-        if (data) setProfile(prev => ({ ...prev, ...data }))
-      } catch (error) { console.error(error) } finally { setLoading(false) }
+        
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+          
+        if (data) {
+          // Remplace les null par des strings vides pour éviter les bugs d'input React
+          const sanitizedData = Object.fromEntries(
+            Object.entries(data).map(([key, val]) => [key, val === null ? '' : val])
+          )
+          setProfile(prev => ({ ...prev, ...sanitizedData }))
+        }
+      } catch (error) { 
+        console.error(error) 
+      } finally { 
+        setLoading(false) 
+      }
     }
     getProfile()
   }, [router, supabase])
@@ -75,13 +93,61 @@ export default function Dashboard() {
     e.preventDefault()
     setUpdating(true)
     
-    // Extraction pour ne pas envoyer scan_count lors de la mise à jour manuelle du profil
-    const { scan_count, ...profileToUpdate } = profile
-
     try {
-      await supabase.from('profiles').upsert({ id: userId, ...profileToUpdate, updated_at: new Date().toISOString() })
-      alert('Profil mis à jour !')
-    } finally { setUpdating(false) }
+      // 1. On prépare l'objet strict à envoyer
+      const profileToUpdate = {
+        full_name: profile.full_name,
+        job_title: profile.job_title,
+        company: profile.company,
+        avatar_url: profile.avatar_url,
+        phone: profile.phone,
+        phone_2: profile.phone_2,
+        phone_3: profile.phone_3,
+        whatsapp: profile.whatsapp,
+        email_contact: profile.email_contact,
+        website_url: profile.website_url,
+        linkedin_url: profile.linkedin_url,
+        instagram_url: profile.instagram_url,
+        facebook_url: profile.facebook_url,
+        twitter_url: profile.twitter_url,
+        tiktok_url: profile.tiktok_url,
+        youtube_url: profile.youtube_url,
+        snapchat_url: profile.snapchat_url,
+        github_url: profile.github_url,
+        updated_at: new Date().toISOString()
+      }
+
+      // 2. NETTOYAGE : PostgreSQL préfère `null` à une chaîne vide `""`.
+      // Cela évite les erreurs de typage sur certaines colonnes.
+      const cleanedProfile = Object.fromEntries(
+        Object.entries(profileToUpdate).map(([key, value]) => [key, value === "" ? null : value])
+      )
+
+      // 3. On utilise .update() avec .eq() (Beaucoup plus sûr que .upsert pour de l'édition)
+      const { error } = await supabase
+        .from('profiles')
+        .update(cleanedProfile)
+        .eq('id', userId)
+        
+      if (error) {
+        // On force l'affichage détaillé de l'erreur Supabase pour le débogage
+        console.error('Erreur Supabase détaillée:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw new Error(error.message || "Erreur inconnue de la base de données")
+      }
+      
+      alert('Profil mis à jour avec succès !')
+    } catch (error: any) {
+      console.error('Erreur capturée:', error)
+      // Désormais, l'alerte t'affichera LE VRAI problème (ex: "Column github_url does not exist")
+      alert(`Erreur de mise à jour :\n${error.message}`)
+    } finally { 
+      setUpdating(false) 
+    }
   }
 
   // --- ÉCRAN DE CHARGEMENT AVEC LOGO DIMACARD ---
@@ -125,7 +191,7 @@ export default function Dashboard() {
         <div className="max-w-5xl mx-auto px-6 h-20 flex justify-between items-center">
           <div className="flex items-center gap-3">
              <img src="/dimacardlogo.jpeg" alt="DimaCard Logo" className="h-10 w-auto object-contain" />
-             <span className="font-black text-xl text-white tracking-tight hidden sm:block" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>DimaCard</span>
+             <span className="font-black text-xl text-white tracking-tight hidden sm:block">DimaCard</span>
           </div>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="text-[#9CA3AF] font-bold flex items-center gap-2 hover:text-red-400 transition-colors">
             <LogOut size={18}/> <span className="hidden sm:inline">Quitter</span>
@@ -146,9 +212,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* SECTION STATISTIQUES (NOUVEAU) */}
+        {/* SECTION STATISTIQUES */}
         <section className="bg-[#111827] rounded-[2rem] p-6 shadow-xl border border-white/5 mb-8">
-          <h2 className="text-sm font-black mb-4 flex items-center gap-2 text-white uppercase tracking-wider" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>
+          <h2 className="text-sm font-black mb-4 flex items-center gap-2 text-white uppercase tracking-wider">
             <BarChart3 size={18} className="text-[#3B82F6]"/> Statistiques d'utilisation
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -167,7 +233,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Note d'information ou deuxième stat future */}
             <div className="bg-[#0B0F19]/40 border border-dashed border-white/10 p-5 rounded-2xl flex flex-col justify-center text-left">
               <p className="text-xs text-[#9CA3AF] leading-relaxed">
                 Le compteur augmente en temps réel à chaque fois que votre <span className="text-[#F5A623] font-bold">DimaCard</span> ou votre lien public est scanné.
@@ -178,7 +243,7 @@ export default function Dashboard() {
 
         <form onSubmit={updateProfile} className="space-y-6">
           <section className="bg-[#111827] rounded-[2rem] p-8 shadow-xl border border-white/5">
-            <h2 className="text-lg font-black mb-6 flex items-center gap-2 text-white" style={{ fontFamily: 'var(--font-display, sans-serif)' }}><UserIcon size={20} className="text-[#F5A623]"/> Identité</h2>
+            <h2 className="text-lg font-black mb-6 flex items-center gap-2 text-white"><UserIcon size={20} className="text-[#F5A623]"/> Identité</h2>
             <div className="flex flex-col md:flex-row gap-8 mb-8 items-center">
               <div className="relative">
                 <div className="w-28 h-28 rounded-[2rem] overflow-hidden bg-[#1F2937] border-4 border-[#0B0F19] shadow-inner">
@@ -198,7 +263,7 @@ export default function Dashboard() {
           </section>
 
           <section className="bg-[#111827] rounded-[2rem] p-8 shadow-xl border border-white/5">
-            <h2 className="text-lg font-black mb-6 flex items-center gap-2 text-white" style={{ fontFamily: 'var(--font-display, sans-serif)' }}><Share2 size={20} className="text-[#8B5CF6]"/> Contacts & Réseaux</h2>
+            <h2 className="text-lg font-black mb-6 flex items-center gap-2 text-white"><Share2 size={20} className="text-[#8B5CF6]"/> Contacts & Réseaux</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <InputGroup label="Téléphone Principal" value={profile.phone} onChange={(v) => setProfile({...profile, phone: v})} />
               <InputGroup label="Téléphone 2" value={profile.phone_2} onChange={(v) => setProfile({...profile, phone_2: v})} />
@@ -212,11 +277,12 @@ export default function Dashboard() {
               <InputGroup label="Twitter / X" value={profile.twitter_url} onChange={(v) => setProfile({...profile, twitter_url: v})} />
               <InputGroup label="YouTube" value={profile.youtube_url} onChange={(v) => setProfile({...profile, youtube_url: v})} />
               <InputGroup label="Snapchat" value={profile.snapchat_url} onChange={(v) => setProfile({...profile, snapchat_url: v})} />
-              <div className="md:col-span-2"><InputGroup label="Site Web" value={profile.website_url} onChange={(v) => setProfile({...profile, website_url: v})} /></div>
+              <InputGroup label="GitHub" value={profile.github_url} onChange={(v) => setProfile({...profile, github_url: v})} />
+              <div className="md:col-span-1"><InputGroup label="Site Web" value={profile.website_url} onChange={(v) => setProfile({...profile, website_url: v})} /></div>
             </div>
           </section>
 
-          <button type="submit" disabled={updating} className="w-full bg-[#F5A623] text-[#0B0F19] py-5 rounded-2xl font-black text-lg shadow-xl shadow-[#F5A623]/20 hover:bg-[#FDE047] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3" style={{ fontFamily: 'var(--font-body, sans-serif)' }}>
+          <button type="submit" disabled={updating} className="w-full bg-[#F5A623] text-[#0B0F19] py-5 rounded-2xl font-black text-lg shadow-xl shadow-[#F5A623]/20 hover:bg-[#FDE047] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3">
             {updating ? <Loader2 className="animate-spin" size={24}/> : <Save size={24}/>} Enregistrer les modifications
           </button>
         </form>
@@ -227,7 +293,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B0F19]/80 backdrop-blur-sm p-4">
           <div className="bg-[#111827] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full text-center relative shadow-2xl animate-in zoom-in duration-200">
             <button onClick={() => setShowQrModal(false)} className="absolute top-6 right-6 text-[#9CA3AF] hover:text-white transition-colors"><X size={24}/></button>
-            <h2 className="text-xl font-black mb-2 text-white" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>Votre QR Code</h2>
+            <h2 className="text-xl font-black mb-2 text-white">Votre QR Code</h2>
             <p className="text-[10px] text-[#F5A623] mb-8 font-bold uppercase tracking-widest">{profile.full_name || 'Profil'}</p>
             
             <div className="bg-white p-4 rounded-[2rem] border-4 border-[#1F2937] inline-block mb-8 shadow-inner">
