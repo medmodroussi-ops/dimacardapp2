@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [ // تحديث الإعدادات لتفادي تحذيرات الـ Deprecation
       {
         protocol: 'https',
-        hostname: 'https://dimacardapp2.vercel.app',
+        hostname: 'dimacardapp2.vercel.app',
         port: '',
         pathname: '/**',
       },
