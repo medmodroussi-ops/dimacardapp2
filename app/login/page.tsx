@@ -1,144 +1,151 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Loader2, Mail, Lock, LogIn, AlertCircle } from 'lucide-react'
+import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
+import toast, { Toaster } from 'react-hot-toast'
 
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
-  
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
+  const [isSignUp, setIsSignUp] = useState(false) // Toggle entre Login et Inscription
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // 1. N-t2akdo wach l'utilisateur aslan connecté (bach n-siwftouh l'Dashboard direct)
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        router.push('/dashboard')
+      }
+    }
+    checkUser()
+  }, [router, supabase])
+
+  // 2. Fonction dyal Login w Inscription
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setErrorMsg('')
+    const loadingToast = toast.loading(isSignUp ? "Création du compte..." : "Connexion en cours...")
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        setErrorMsg("Email ou mot de passe incorrect.")
-        setLoading(false)
-        return
+      if (isSignUp) {
+        // INSCRIPTION (Sign Up)
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        })
+        if (error) throw error
+        toast.success("Compte créé avec succès ! Tu peux te connecter.", { id: loadingToast })
+        setIsSignUp(false) // N-rej3ouh l'page dyal Login bach y-dkhel
+        setPassword('') // N-khwiw l'mot de passe
+      } else {
+        // CONNEXION (Sign In)
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        if (error) throw error
+        toast.success("Connecté !", { id: loadingToast })
+        router.push('/dashboard') // N-siftooh l'Dashboard
       }
-
-      if (data?.user) {
-        // 🟢 C'EST ICI QUE LA MAGIE OPÈRE : LE TRI INTELLIGENT
-        
-        // ⚠️ REMPLACEZ PAR VOTRE VRAI EMAIL ADMINISTRATEUR
-        const adminEmails = ['test@test.com'] 
-
-        if (data.user.email && adminEmails.includes(data.user.email)) {
-          // C'est l'administrateur -> Go au Panel Admin
-          router.push('/admin')
-        } else {
-          // C'est un client normal -> Go au Dashboard Client
-          router.push('/dashboard')
-        }
-      }
-    } catch (err) {
-      setErrorMsg("Une erreur inattendue s'est produite.")
+    } catch (error: any) {
+      toast.error(`Erreur: ${error.message}`, { id: loadingToast })
+    } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#0B0F19] text-[#F9FAFB] flex items-center justify-center p-4 font-sans relative overflow-hidden">
+      <Toaster position="top-center" toastOptions={{ style: { background: '#1F2937', color: '#fff' } }}/>
       
-      {/* Effets de lumière en arrière-plan (Glows) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#8B5CF6]/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-[#F5A623]/10 blur-[120px] rounded-full pointer-events-none" />
+      {/* Background Éléments (Décoration) */}
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-[#F5A623]/10 blur-[100px] rounded-full pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-[#F5A623]/5 blur-[100px] rounded-full pointer-events-none"></div>
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center relative z-10">
-        <div className="w-20 h-20 bg-[#111827] rounded-[1.5rem] border border-white/10 flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(245,166,35,0.15)] relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-tr from-[#F5A623]/10 to-transparent pointer-events-none" />
-          {/* Logo DimaCard ou Icône */}
-          <img 
-            src="/dimacardlogo.jpeg" 
-            alt="DimaCard Logo" 
-            className="w-full h-full object-contain relative z-10 rounded-[1.5rem]" 
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              // Si l'image ne charge pas, on affiche l'icône de secours
-              e.currentTarget.parentElement?.querySelector('svg')?.classList.remove('hidden');
-            }} 
-          />
-          <LogIn size={32} className="text-[#F5A623] relative z-10 hidden" />
+      {/* Carte de Connexion */}
+      <div className="w-full max-w-md bg-[#111827] rounded-[2rem] p-8 sm:p-10 border border-white/5 shadow-2xl relative z-10">
+        
+        {/* Logo / Titre */}
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-black tracking-tight text-white mb-2">
+            Dima<span className="text-[#F5A623]">Card</span>
+          </h1>
+          <p className="text-gray-400 text-sm">
+            {isSignUp ? "Créez votre compte pour commencer" : "Connectez-vous pour gérer votre carte"}
+          </p>
         </div>
-        <h2 className="text-3xl font-black text-white tracking-tight" style={{ fontFamily: 'var(--font-display, sans-serif)' }}>Connexion</h2>
-        <p className="mt-2 text-sm text-[#9CA3AF] font-medium tracking-wide">Accédez à votre espace <span className="text-[#F5A623] font-bold">DimaCard</span></p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-[#111827] py-8 px-6 shadow-2xl shadow-black/50 sm:rounded-[2.5rem] sm:px-10 border border-white/5 relative overflow-hidden">
-          
-          {/* Lueur interne de la carte */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#F5A623]/5 blur-[50px] rounded-full pointer-events-none" />
-          
-          <form className="space-y-6 relative z-10" onSubmit={handleLogin}>
-            
-            {/* Message d'Erreur */}
-            {errorMsg && (
-              <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl text-red-400 text-sm font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle size={18} className="shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
+        {/* Formulaire */}
+        <form onSubmit={handleAuth} className="space-y-5">
+          {/* Email */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Adresse Email</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vous@email.com"
+                required
+                className="w-full bg-[#0B0F19] border border-white/10 py-4 pl-12 pr-4 rounded-xl text-sm text-white outline-none focus:border-[#F5A623] focus:ring-1 focus:ring-[#F5A623] transition-all placeholder:text-gray-600"
+              />
+            </div>
+          </div>
+
+          {/* Mot de passe */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Mot de passe</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+                className="w-full bg-[#0B0F19] border border-white/10 py-4 pl-12 pr-4 rounded-xl text-sm text-white outline-none focus:border-[#F5A623] focus:ring-1 focus:ring-[#F5A623] transition-all placeholder:text-gray-600"
+              />
+            </div>
+          </div>
+
+          {/* Bouton de Soumission */}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full mt-8 bg-[#F5A623] text-black py-4 rounded-xl font-black text-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-[#F5A623]/20 hover:bg-[#E09612]"
+          >
+            {loading ? (
+              <Loader2 className="animate-spin" size={24}/>
+            ) : (
+              <>
+                {isSignUp ? "Créer mon compte" : "Se connecter"} <ArrowRight size={20} />
+              </>
             )}
+          </button>
+        </form>
 
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2 ml-1">Adresse Email</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#9CA3AF]">
-                  <Mail size={18} />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3.5 bg-[#0B0F19] border border-white/10 rounded-xl text-white font-medium focus:bg-[#1F2937] focus:border-[#F5A623] outline-none transition-all placeholder:text-gray-600 shadow-inner"
-                  placeholder="exemple@email.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2 ml-1">Mot de passe</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#9CA3AF]">
-                  <Lock size={18} />
-                </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3.5 bg-[#0B0F19] border border-white/10 rounded-xl text-white font-medium focus:bg-[#1F2937] focus:border-[#F5A623] outline-none transition-all placeholder:text-gray-600 shadow-inner"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center items-center gap-2 py-4 px-4 border border-transparent rounded-2xl shadow-lg shadow-[#F5A623]/20 text-sm font-black text-[#0B0F19] bg-[#F5A623] hover:bg-[#FDE047] focus:outline-none active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed transition-all uppercase tracking-wide mt-2"
+        {/* Toggle Login / Register */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-400">
+            {isSignUp ? "Vous avez déjà un compte ?" : "Vous n'avez pas de compte ?"}
+            <button 
+              type="button" 
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="ml-2 text-[#F5A623] font-bold hover:underline"
             >
-              {loading ? <Loader2 className="animate-spin text-[#0B0F19]" size={20} /> : <LogIn size={20} className="text-[#0B0F19]" />}
-              {loading ? 'Connexion en cours...' : 'Se connecter'}
+              {isSignUp ? "Se connecter" : "S'inscrire"}
             </button>
-          </form>
-
+          </p>
         </div>
+
       </div>
     </div>
   )

@@ -1,327 +1,329 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { 
-  Users, Search, Trash2, Edit, ShieldCheck, 
-  X, Save, Ban, CheckCircle, Plus, QrCode, Download, 
-  Share2, Link as LinkIcon, Loader2, Calendar, AlertCircle
+  Users, CreditCard, Activity, ShieldAlert, Search, 
+  Trash2, Eye, Lock, Unlock, Loader2, LogOut, Settings, 
+  Edit, X, Save 
 } from 'lucide-react'
-import { QRCodeCanvas } from 'qrcode.react'
+import toast, { Toaster } from 'react-hot-toast'
 
 export default function AdminDashboard() {
   const supabase = createClient()
   const router = useRouter()
   
-  const [profiles, setProfiles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isMounted, setIsMounted] = useState(false)
+  const [profiles, setProfiles] = useState<any[]>([])
+  const [search, setSearch] = useState('')
   
+  // States dyal les Modals (Edition & Limites)
   const [editingProfile, setEditingProfile] = useState<any>(null)
-  const [isCreating, setIsCreating] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [qrProfile, setQrProfile] = useState<any>(null)
+  const [savingUpdate, setSavingUpdate] = useState(false)
+  const [limitModal, setLimitModal] = useState<any>(null)
+  const [savingLimit, setSavingLimit] = useState(false)
 
-  const initialProfileState = {
-    full_name: '', job_title: '', company: '', email_contact: '',
-    phone: '', phone_2: '', phone_3: '', whatsapp: '',
-    linkedin_url: '', instagram_url: '', facebook_url: '',
-    twitter_url: '', tiktok_url: '', youtube_url: '',
-    snapchat_url: '', website_url: '', expiration_date: '', status: 'actif'
-  }
+  // Statistiques Globales
+  const totalCards = profiles.length
+  const totalViews = profiles.reduce((acc, curr) => acc + (curr.scan_count || 0), 0)
+  const activeCards = profiles.filter(p => p.status !== 'suspendu').length
+  const suspendedCards = profiles.filter(p => p.status === 'suspendu').length
 
   useEffect(() => {
-    checkAdminAccess()
+    fetchGlobalData()
   }, [])
 
-  async function checkAdminAccess() {
+  // 1. CHARGEMENT DE TOUTES LES CARTES
+  async function fetchGlobalData() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      
-      const adminEmails = ['test@test.com'] // <--- TON EMAIL ICI
-      if (!user.email || !adminEmails.includes(user.email)) {
-        router.push('/dashboard'); return
-      }
-      setIsMounted(true)
-      fetchProfiles()
-    } catch (error) { router.push('/login') }
-  }
 
-  async function fetchProfiles() {
-    try {
-      const { data, error } = await supabase.from('profiles').select('*')
-      if (!error && data) setProfiles(data)
-    } finally { setLoading(false) }
-  }
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        
 
-  const deleteProfile = async (id: string) => {
-    if (confirm("Supprimer définitivement ce profil ?")) {
-      await supabase.from('profiles').delete().eq('id', id)
-      fetchProfiles()
+      if (error) throw error
+      setProfiles(data || [])
+    } catch (error: any) {
+      toast.error("Erreur de chargement: " + error.message)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const toggleSuspendProfile = async (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'suspendu' ? 'actif' : 'suspendu';
-    if (confirm(`Changer le statut en ${newStatus} ?`)) {
-      await supabase.from('profiles').update({ status: newStatus }).eq('id', id);
-      fetchProfiles();
-    }
-  };
+  // 2. BLOQUER / DÉBLOQUER UNE CARTE
+  async function toggleStatus(id: string, currentStatus: string) {
+    const newStatus = currentStatus === 'suspendu' ? 'actif' : 'suspendu'
+    const loadingToast = toast.loading("Mise à jour...")
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: newStatus })
+      .eq('id', id)
 
-  const saveProfile = async (e: React.FormEvent) => {
+    if (error) {
+      toast.error("Erreur !", { id: loadingToast })
+    } else {
+      toast.success(`Carte ${newStatus === 'suspendu' ? 'suspendue' : 'activée'} !`, { id: loadingToast })
+      setProfiles(profiles.map(p => p.id === id ? { ...p, status: newStatus } : p))
+    }
+  }
+
+  // 3. SUPPRIMER UNE CARTE DÉFINITIVEMENT
+  async function deleteCard(id: string, name: string) {
+    if (!window.confirm(`Wach m2aked bghiti tmsa7 l'carte "${name}" b-sifa niha2iya?`)) return
+    
+    const loadingToast = toast.loading("Suppression en cours...")
+    const { error } = await supabase.from('profiles').delete().eq('id', id)
+    
+    if (error) {
+      toast.error(`Erreur: ${error.message}`, { id: loadingToast })
+    } else {
+      toast.success("Carte supprimée avec succès !", { id: loadingToast })
+      setProfiles(profiles.filter(p => p.id !== id))
+    }
+  }
+
+  // 4. SAUVEGARDER LES MODIFICATIONS D'UN PROFIL (Édition)
+  async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault()
-    setIsSaving(true)
+    if (!editingProfile) return
+    
+    setSavingUpdate(true)
+    const loadingToast = toast.loading("Enregistrement...")
+
     try {
-      if (isCreating) {
-        const cleanEmail = editingProfile.email_contact.trim()
-        const temporaryPassword = crypto.randomUUID().slice(0, 8) + "-Aa1!"
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: cleanEmail, password: temporaryPassword,
-        })
-        if (authError) throw authError
-        await supabase.from('profiles').upsert([{ id: authData.user?.id, ...editingProfile }])
-        alert(`Succès !\nEmail: ${cleanEmail}\nPass: ${temporaryPassword}`)
-      } else {
-        await supabase.from('profiles').update(editingProfile).eq('id', editingProfile.id)
-      }
+      const { id, owner_id, created_at, scan_count, ...updateData } = editingProfile
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', editingProfile.id)
+
+      if (error) throw error
+
+      setProfiles(profiles.map(p => p.id === editingProfile.id ? editingProfile : p))
+      toast.success("Profil mis à jour !", { id: loadingToast })
       setEditingProfile(null)
-      fetchProfiles()
-    } catch (err: any) { alert(err.message) } finally { setIsSaving(false) }
+    } catch (error: any) {
+      toast.error(`Erreur : ${error.message}`, { id: loadingToast })
+    } finally {
+      setSavingUpdate(false)
+    }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setEditingProfile((prev: any) => ({ ...prev, [name]: value }))
+  // 5. OUVRIR LE MODAL DE LIMITE
+  async function openLimitModal(owner_id: string, user_name: string) {
+    const loadingToast = toast.loading("Chargement des limites...")
+    const { data, error } = await supabase.from('user_limits').select('max_profiles').eq('owner_id', owner_id).single()
+    toast.dismiss(loadingToast)
+    
+    setLimitModal({
+      owner_id,
+      max_profiles: data ? data.max_profiles : 1, // Par défaut 1 si non défini
+      user_name
+    })
   }
 
-  const isExpired = (date: string) => {
-    if (!date) return false;
-    return new Date(date) < new Date();
+  // 6. SAUVEGARDER LA LIMITE D'UN CLIENT
+  async function saveLimit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!limitModal) return
+    setSavingLimit(true)
+    const loadingToast = toast.loading("Enregistrement...")
+    
+    const { error } = await supabase.from('user_limits').upsert({
+      owner_id: limitModal.owner_id,
+      max_profiles: limitModal.max_profiles
+    })
+    
+    if (error) {
+      toast.error(`Erreur: ${error.message}`, { id: loadingToast })
+    } else {
+      toast.success(`Limite de ${limitModal.user_name} mise à jour !`, { id: loadingToast })
+      setLimitModal(null)
+    }
+    setSavingLimit(false)
   }
 
-  if (!isMounted) return null
-
+  // 7. FILTRE DE RECHERCHE
   const filteredProfiles = profiles.filter(p => 
-    (p.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-    (p.email_contact?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    (p.full_name?.toLowerCase() || '').includes(search.toLowerCase()) || 
+    (p.owner_id || '').includes(search)
   )
 
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0F19]">
-      <div className="relative">
-        <div className="absolute inset-0 bg-[#F5A623]/20 rounded-full blur-xl animate-pulse"></div>
-        <img 
-          src="dimacardlogo.jpeg" 
-          alt="Loading DimaCard" 
-          className="w-24 h-24 object-contain relative z-10 animate-bounce" 
-          style={{ animationDuration: '2s' }}
-        />
-      </div>
-      
-      <div className="mt-8 w-48 h-1 bg-[#1F2937] rounded-full overflow-hidden">
-        <div className="h-full bg-[#F5A623] rounded-full animate-infinite-loading"></div>
-      </div>
-      
-      <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-[#9CA3AF]">
-        DimaCard
-      </p>
-  
-      <style jsx>{`
-        @keyframes infinite-loading {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .animate-infinite-loading {
-          width: 100%;
-          animation: infinite-loading 1.5s infinite linear;
-        }
-      `}</style>
-    </div>
-  )
-
-
+  if (loading) return <div className="min-h-screen bg-[#0B0F19] flex items-center justify-center"><Loader2 className="animate-spin text-indigo-500" size={40} /></div>
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] p-4 md:p-10 text-[#F9FAFB] font-sans">
-      <div className="max-w-6xl mx-auto">
-        
-        {/* NAV BAR AVEC LOGO */}
-        <nav className="bg-[#111827] rounded-3xl p-6 shadow-lg border border-white/5 flex items-center justify-between mb-10 gap-4 flex-wrap relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#F5A623]/5 blur-[80px] rounded-full pointer-events-none" />
-          <div className="flex items-center gap-3 relative z-10">
-            <h1 className="text-3xl font-black flex items-center gap-3 shrink-0" style={{ fontFamily: 'var(--font-display)' }}><ShieldCheck className="text-[#F5A623]" size={32} /> Admin</h1>
-            <p className="text-[#9CA3AF] font-medium whitespace-nowrap hidden sm:block">| {profiles.length} comptes</p>
-          </div>
-          
-          {/* --- TON LOGO ICI --- */}
-          <div className="order-first sm:order-none mx-auto sm:mx-0 shrink-0 relative z-10">
-            <img 
-              src="dimacardlogo.jpeg" // <--- REMPLACE PAR LE CHEMIN VERS TON IMAGE DE LOGO
-              alt="DimaCard Logo" 
-              className="h-16 w-auto object-contain" 
-            />
-          </div>
-          
-          <div className="flex gap-3 w-full sm:w-auto relative z-10">
-            <div className="relative flex-1 sm:flex-initial">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={18} />
-              <input type="text" placeholder="Rechercher..." className="pl-10 pr-4 py-3 bg-[#1F2937] border border-white/10 rounded-xl outline-none w-full sm:w-64 shadow-sm text-white focus:border-[#F5A623] transition-colors" onChange={(e) => setSearchTerm(e.target.value)} />
-            </div>
-            <button onClick={() => { setEditingProfile(initialProfileState); setIsCreating(true); }} className="px-6 py-3 bg-[#F5A623] text-[#0B0F19] font-bold rounded-xl flex items-center gap-2 hover:bg-[#FDE047] transition-all shadow-lg shadow-[#F5A623]/20 shrink-0">
-              <Plus size={20} /> Nouveau
-            </button>
-          </div>
-        </nav>
+    <div className="min-h-screen bg-[#0B0F19] text-[#F9FAFB] font-sans">
+      <Toaster position="top-right" />
 
-        {/* LISTE DES PROFILS */}
-        <div className="bg-[#111827] rounded-[2.5rem] border border-white/5 shadow-xl overflow-hidden relative">
-          <table className="w-full text-left border-collapse min-w-[700px]">
-            <thead className="bg-[#1F2937] border-b border-white/5">
-              <tr>
-                <th className="px-6 py-4 text-[10px] font-black uppercase text-[#9CA3AF] tracking-wider">Utilisateur</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase text-[#9CA3AF] tracking-wider">Expiration</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase text-[#9CA3AF] tracking-wider">Statut</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase text-[#9CA3AF] text-right tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredProfiles.map((p) => {
-                const expired = isExpired(p.expiration_date);
-                return (
-                  <tr key={p.id} className={`hover:bg-[#1F2937]/50 transition-colors ${p.status === 'suspendu' || expired ? 'bg-red-900/10' : ''}`}>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#1F2937] flex items-center justify-center shrink-0 border border-white/10 shadow-inner">
-                          {p.avatar_url ? <img src={p.avatar_url} className="w-full h-full object-cover rounded-xl" /> : <Users size={18} className="text-[#9CA3AF]" />}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-white leading-none mb-1 truncate">
-                            {p.full_name || 'Sans nom'}
-                          </span>
-                          <span className="text-[10px] text-[#F5A623] font-bold uppercase tracking-tight truncate">{p.company || 'Aucune entreprise'}</span>
-                        </div>
-                      </div>
+      {/* Navbar Admin */}
+      <nav className="bg-[#111827] border-b border-indigo-500/20 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-500">
+              <ShieldAlert size={24} />
+            </div>
+            <span className="font-black text-2xl text-white">DimaCard <span className="text-indigo-500">Admin</span></span>
+          </div>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="text-gray-400 hover:text-white flex items-center gap-2">
+            <LogOut size={18}/> Déconnexion
+          </button>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-6 py-10 relative">
+        
+        {/* Section: Statistiques */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+          <StatCard icon={<CreditCard/>} label="Total Cartes" value={totalCards} color="text-blue-500" bg="bg-blue-500/10" />
+          <StatCard icon={<Activity/>} label="Total Vues (Scans)" value={totalViews} color="text-indigo-500" bg="bg-indigo-500/10" />
+          <StatCard icon={<Unlock/>} label="Cartes Actives" value={activeCards} color="text-emerald-500" bg="bg-emerald-500/10" />
+          <StatCard icon={<Lock/>} label="Cartes Suspendues" value={suspendedCards} color="text-red-500" bg="bg-red-500/10" />
+        </div>
+
+        {/* Section: Liste des Cartes */}
+        <div className="bg-[#111827] border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+          <div className="p-6 md:p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+            <h2 className="text-xl font-black flex items-center gap-2"><Users size={20} className="text-indigo-500"/> Gestion des Profils</h2>
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+              <input 
+                type="text" 
+                placeholder="Rechercher par nom ou Owner ID..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-[#0B0F19] border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-[#0B0F19]/50 text-[10px] uppercase tracking-widest text-gray-500">
+                  <th className="p-4 pl-8 font-bold">Profil</th>
+                  <th className="p-4 font-bold">Vues</th>
+                  <th className="p-4 font-bold">Owner ID</th>
+                  <th className="p-4 font-bold">Statut</th>
+                  <th className="p-4 pr-8 font-bold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredProfiles.length > 0 ? filteredProfiles.map((p) => (
+                  <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="p-4 pl-8">
+                      <p className="font-bold text-sm text-white">{p.full_name || 'Sans Nom'}</p>
+                      <p className="text-xs text-gray-500">{p.job_title || 'Pas de poste'}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      {p.expiration_date ? (
-                        <div className="flex flex-col">
-                           <span className={`text-[11px] font-bold ${expired ? 'text-red-400' : 'text-[#9CA3AF]'}`}>
-                            {new Date(p.expiration_date).toLocaleDateString()}
-                          </span>
-                          {expired && <span className="text-[8px] font-black text-red-500 flex items-center gap-1 uppercase leading-none mt-1"><AlertCircle size={10}/> Expiré</span>}
-                        </div>
-                      ) : <span className="text-[#9CA3AF] text-[10px]">Illimité</span>}
+                    <td className="p-4">
+                      <span className="bg-indigo-500/10 text-indigo-400 px-3 py-1 rounded-full text-xs font-bold">{p.scan_count || 0}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${p.status === 'suspendu' ? 'bg-red-900/30 text-red-400 border border-red-500/20' : 'bg-emerald-900/30 text-emerald-400 border border-emerald-500/20'}`}>
-                          {p.status || 'actif'}
-                      </span>
+                    <td className="p-4">
+                      <code className="text-[10px] text-gray-500 bg-[#0B0F19] px-2 py-1 rounded border border-white/5">{p.owner_id?.slice(0,8)}...</code>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-1">
-                        <button onClick={() => setQrProfile(p)} className="p-2.5 hover:bg-[#1F2937] rounded-xl text-[#9CA3AF] hover:text-white transition-colors" title="QR Code"><QrCode size={18}/></button>
-                        <button onClick={() => toggleSuspendProfile(p.id, p.status)} className={`p-2.5 rounded-xl transition-all ${p.status === 'suspendu' ? 'text-emerald-400 hover:bg-emerald-900/30' : 'text-[#F5A623] hover:bg-[#F5A623]/10'}`} title={p.status === 'suspendu' ? "Réactiver" : "Suspendre"}>
-                          {p.status === 'suspendu' ? <CheckCircle size={18}/> : <Ban size={18}/>}
-                        </button>
-                        <button onClick={() => { setEditingProfile(p); setIsCreating(false); }} className="p-2.5 hover:bg-[#8B5CF6]/10 rounded-xl text-[#8B5CF6] transition-colors" title="Éditer"><Edit size={18}/></button>
-                        <button onClick={() => deleteProfile(p.id)} className="p-2.5 hover:bg-red-900/20 rounded-xl text-red-400 transition-colors" title="Supprimer"><Trash2 size={18}/></button>
-                      </div>
+                    <td className="p-4">
+                      {p.status === 'suspendu' 
+                        ? <span className="text-red-500 text-xs font-bold flex items-center gap-1"><Lock size={12}/> Suspendu</span>
+                        : <span className="text-emerald-500 text-xs font-bold flex items-center gap-1"><Check size={12}/> Actif</span>
+                      }
+                    </td>
+                    <td className="p-4 pr-8 text-right flex justify-end gap-2">
+                      <a href={`/p/${p.id}`} target="_blank" rel="noreferrer" className="p-2 bg-blue-500/10 text-blue-500 rounded-lg hover:bg-blue-500/20 transition-all" title="Voir la carte">
+                        <Eye size={16}/>
+                      </a>
+                      
+                      <button onClick={() => setEditingProfile(p)} className="p-2 bg-yellow-500/10 text-yellow-500 rounded-lg hover:bg-yellow-500/20 transition-all" title="Modifier le profil">
+                        <Edit size={16}/>
+                      </button>
+
+                      <button onClick={() => openLimitModal(p.owner_id, p.full_name)} className="p-2 bg-purple-500/10 text-purple-500 rounded-lg hover:bg-purple-500/20 transition-all" title="Gérer le forfait (limites)">
+                        <Settings size={16}/>
+                      </button>
+
+                      <button onClick={() => toggleStatus(p.id, p.status)} className={`p-2 rounded-lg transition-all ${p.status === 'suspendu' ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' : 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20'}`} title={p.status === 'suspendu' ? 'Réactiver' : 'Suspendre'}>
+                        {p.status === 'suspendu' ? <Unlock size={16}/> : <Lock size={16}/>}
+                      </button>
+
+                      <button onClick={() => deleteCard(p.id, p.full_name)} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-all" title="Supprimer">
+                        <Trash2 size={16}/>
+                      </button>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                )) : (
+                  <tr><td colSpan={5} className="p-10 text-center text-gray-500">Aucune carte trouvée.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </main>
 
-      {/* MODAL QR CODE */}
-      {qrProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0F19]/80 backdrop-blur-sm">
-          <div className="bg-[#111827] border border-white/10 p-8 rounded-[2.5rem] max-w-sm w-full text-center relative shadow-2xl animate-in zoom-in duration-200">
-            <button onClick={() => setQrProfile(null)} className="absolute top-6 right-6 text-[#9CA3AF] hover:text-white transition-colors"><X size={24}/></button>
-            <h2 className="text-xl font-black mb-1 text-white">QR Code</h2>
-            <p className="text-xs text-[#F5A623] mb-8 truncate uppercase font-bold tracking-widest px-4">{qrProfile.full_name}</p>
-            <div className="bg-white p-4 rounded-[2rem] border-4 border-[#1F2937] inline-block mb-8 shadow-inner">
-              <QRCodeCanvas id="qr-canvas" value={`${window.location.origin}/p/${qrProfile.id}`} size={200} level="H" includeMargin={true} />
-            </div>
-            <button onClick={() => {
-                const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
-                const link = document.createElement('a');
-                link.href = canvas.toDataURL();
-                link.download = `QR_${qrProfile.full_name}.png`;
-                link.click();
-            }} className="w-full py-4 bg-[#F5A623] text-[#0B0F19] font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-[#FDE047] transition-all shadow-lg shadow-[#F5A623]/20 active:scale-95"><Download size={20}/> Télécharger</button>
+      {/* 🚀 MODAL DE MODIFICATION RAPIDE */}
+      {editingProfile && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#111827] p-8 rounded-[2rem] w-full max-w-lg border border-white/10 relative my-8">
+            <button onClick={() => setEditingProfile(null)} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors"><X size={24}/></button>
+            <h2 className="text-2xl font-black mb-6 text-white flex items-center gap-2"><Edit size={24} className="text-yellow-500"/> Modifier la carte</h2>
+            
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Nom complet</label>
+                  <input type="text" value={editingProfile.full_name || ''} onChange={e => setEditingProfile({...editingProfile, full_name: e.target.value})} className="w-full bg-[#0B0F19] border border-white/10 p-3 rounded-xl text-sm text-white outline-none focus:border-yellow-500 mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Poste actuel</label>
+                  <input type="text" value={editingProfile.job_title || ''} onChange={e => setEditingProfile({...editingProfile, job_title: e.target.value})} className="w-full bg-[#0B0F19] border border-white/10 p-3 rounded-xl text-sm text-white outline-none focus:border-yellow-500 mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Entreprise</label>
+                  <input type="text" value={editingProfile.company || ''} onChange={e => setEditingProfile({...editingProfile, company: e.target.value})} className="w-full bg-[#0B0F19] border border-white/10 p-3 rounded-xl text-sm text-white outline-none focus:border-yellow-500 mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Téléphone</label>
+                  <input type="text" value={editingProfile.phone || ''} onChange={e => setEditingProfile({...editingProfile, phone: e.target.value})} className="w-full bg-[#0B0F19] border border-white/10 p-3 rounded-xl text-sm text-white outline-none focus:border-yellow-500 mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Couleur (Hex)</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="color" value={editingProfile.theme_color || '#F5A623'} onChange={e => setEditingProfile({...editingProfile, theme_color: e.target.value})} className="w-10 h-10 rounded cursor-pointer bg-transparent border-0 p-0" />
+                    <input type="text" value={editingProfile.theme_color || ''} onChange={e => setEditingProfile({...editingProfile, theme_color: e.target.value})} className="flex-1 bg-[#0B0F19] border border-white/10 p-3 rounded-xl text-sm text-white outline-none focus:border-yellow-500 uppercase font-mono" />
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" disabled={savingUpdate} className="w-full mt-6 bg-yellow-500 text-black py-4 rounded-xl font-black text-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20 hover:bg-yellow-400">
+                {savingUpdate ? <Loader2 className="animate-spin" size={24}/> : <Save size={24}/>} Enregistrer les modifications
+              </button>
+            </form>
           </div>
         </div>
       )}
 
-      {/* MODAL ÉDITION GÉNÉRALE */}
-      {editingProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0B0F19]/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-[#111827] border border-white/10 rounded-[2.5rem] w-full max-w-4xl shadow-2xl my-auto animate-in zoom-in duration-200">
-            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-[#1F2937] rounded-t-[2.5rem]">
-              <h2 className="text-xl font-black flex items-center gap-2 text-white"><Share2 className="text-[#F5A623]"/> {isCreating ? 'Nouveau Profil' : 'Gestion Complète'}</h2>
-              <button onClick={() => setEditingProfile(null)} className="text-[#9CA3AF] hover:text-white bg-[#0B0F19] p-2 rounded-full shadow-sm border border-white/5"><X size={24}/></button>
-            </div>
+      {/* 🚀 MODAL DE LIMITE DE PROFILS */}
+      {limitModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111827] p-8 rounded-[2rem] w-full max-w-sm border border-purple-500/30 relative">
+            <button onClick={() => setLimitModal(null)} className="absolute top-6 right-6 text-gray-500 hover:text-white"><X size={24}/></button>
+            <h2 className="text-xl font-black mb-2 text-white">Forfait & Limite</h2>
+            <p className="text-sm text-gray-400 mb-6">Client: <strong className="text-white">{limitModal.user_name}</strong></p>
             
-            <form onSubmit={saveProfile} className="p-8 pb-12 relative overflow-hidden">
-              <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#8B5CF6]/5 blur-[100px] rounded-full pointer-events-none" />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 relative z-10">
-                
-                {/* COLONNE 1 : IDENTITÉ & EXPIRATION */}
-                <div className="space-y-4">
-                    <p className="text-[10px] font-black text-[#F5A623] uppercase tracking-widest flex items-center gap-2 mb-3"><Users size={14}/> Identité & Validité</p>
-                    <AdminInput label="Nom Complet" name="full_name" value={editingProfile.full_name} onChange={handleInputChange} required />
-                    <AdminInput label="Email" name="email_contact" value={editingProfile.email_contact} onChange={handleInputChange} required />
-                    <AdminInput label="Poste / Job" name="job_title" value={editingProfile.job_title} onChange={handleInputChange} />
-                    <AdminInput label="Entreprise" name="company" value={editingProfile.company} onChange={handleInputChange} />
-                    
-                    {/* CHAMP DATE D'EXPIRATION */}
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[9px] font-black text-red-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Calendar size={10}/> Date d'expiration</label>
-                      <input type="date" name="expiration_date" value={editingProfile.expiration_date || ''} onChange={handleInputChange} className="w-full p-3 bg-red-900/10 border border-red-500/20 rounded-xl font-bold text-xs text-red-200 outline-none focus:border-red-400 transition-all shadow-sm" style={{ colorScheme: 'dark' }} />
-                    </div>
-                </div>
-
-                {/* COLONNE 2 : TÉLÉPHONES */}
-                <div className="space-y-4">
-                    <p className="text-[10px] font-black text-[#8B5CF6] uppercase tracking-widest flex items-center gap-2 mb-3"><LinkIcon size={14}/> Téléphones</p>
-                    <AdminInput label="Téléphone Principal" name="phone" value={editingProfile.phone} onChange={handleInputChange} />
-                    <AdminInput label="Téléphone 2" name="phone_2" value={editingProfile.phone_2} onChange={handleInputChange} />
-                    <AdminInput label="Téléphone 3" name="phone_3" value={editingProfile.phone_3} onChange={handleInputChange} />
-                    <AdminInput label="WhatsApp" name="whatsapp" value={editingProfile.whatsapp} onChange={handleInputChange} />
-                </div>
-
-                {/* COLONNE 3 : RÉSEAUX SOCIAUX */}
-                <div className="space-y-4">
-                    <p className="text-[10px] font-black text-[#06B6D4] uppercase tracking-widest flex items-center gap-2 mb-3"><Share2 size={14}/> Réseaux Sociaux</p>
-                    <AdminInput label="LinkedIn" name="linkedin_url" value={editingProfile.linkedin_url} onChange={handleInputChange} />
-                    <AdminInput label="Instagram" name="instagram_url" value={editingProfile.instagram_url} onChange={handleInputChange} />
-                    <AdminInput label="TikTok" name="tiktok_url" value={editingProfile.tiktok_url} onChange={handleInputChange} />
-                    <AdminInput label="YouTube" name="youtube_url" value={editingProfile.youtube_url} onChange={handleInputChange} />
-                    <AdminInput label="Site Web" name="website_url" value={editingProfile.website_url} onChange={handleInputChange} />
-                </div>
-
-              </div>
-
-              <div className="fixed bottom-0 left-0 right-0 md:relative bg-[#1F2937]/90 backdrop-blur-sm md:bg-transparent md:backdrop-blur-none p-6 md:p-0 md:mt-10 md:pt-6 md:border-t flex justify-between items-center gap-6 z-20 border-t border-white/5 md:border-white/10 rounded-t-3xl md:rounded-none">
-                <div className="flex items-center gap-2 mr-auto shrink-0">
-                    <span className="text-[10px] font-black uppercase text-[#9CA3AF] font-black">Statut :</span>
-                    <select name="status" value={editingProfile.status} onChange={handleInputChange} className="bg-[#0B0F19] border border-white/10 text-white rounded-lg font-bold text-xs p-2 outline-none focus:border-[#F5A623]">
-                        <option value="actif">Actif</option>
-                        <option value="suspendu">Suspendu</option>
-                    </select>
-                </div>
-                <button type="button" onClick={() => setEditingProfile(null)} className="font-bold text-[#9CA3AF] hover:text-white shrink-0 transition-colors">Annuler</button>
-                <button type="submit" disabled={isSaving} className="px-10 py-4 bg-[#F5A623] text-[#0B0F19] font-black rounded-2xl shadow-lg shadow-[#F5A623]/20 flex items-center gap-2 hover:bg-[#FDE047] transition-all active:scale-95 shrink-0 disabled:opacity-50">
-                   {isSaving ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} Enregistrer
-                </button>
-              </div>
+            <form onSubmit={saveLimit}>
+              <label className="text-[10px] font-bold uppercase text-purple-400 ml-1">Nombre maximum de cartes autorisées</label>
+              <input 
+                type="number" min="1" max="100"
+                value={limitModal.max_profiles} 
+                onChange={e => setLimitModal({...limitModal, max_profiles: parseInt(e.target.value)})} 
+                className="w-full bg-[#0B0F19] border border-white/10 p-4 rounded-xl text-lg text-white outline-none focus:border-purple-500 mt-2 font-black text-center" 
+              />
+              <button type="submit" disabled={savingLimit} className="w-full mt-6 bg-purple-500 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-600 transition-all">
+                {savingLimit ? <Loader2 className="animate-spin" size={20}/> : "Confirmer la limite"}
+              </button>
             </form>
           </div>
         </div>
@@ -330,11 +332,21 @@ export default function AdminDashboard() {
   )
 }
 
-function AdminInput({ label, ...props }: any) {
+// COMPOSANTS RÉUTILISABLES
+function StatCard({ icon, label, value, color, bg }: any) {
   return (
-    <div className="flex flex-col gap-1 w-full text-left">
-      <label className="text-[9px] font-black text-[#9CA3AF] uppercase tracking-widest ml-1">{label}</label>
-      <input {...props} className="w-full p-3 bg-[#0B0F19] border border-white/10 rounded-xl font-bold text-xs text-white outline-none focus:border-[#F5A623] transition-all shadow-sm placeholder:text-[#4B5563]" placeholder="..." />
+    <div className="bg-[#111827] p-6 rounded-[2rem] border border-white/5 flex items-center gap-4">
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${bg} ${color}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{label}</p>
+        <p className="text-3xl font-black text-white">{value}</p>
+      </div>
     </div>
   )
+}
+
+function Check(props: any) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="20 6 9 17 4 12"></polyline></svg>
 }
