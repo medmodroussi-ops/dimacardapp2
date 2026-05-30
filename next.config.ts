@@ -9,15 +9,18 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  turbopack: {}, // هذا السطر يخبر Next.js بتجاهل تعارضات Webpack
+   // هذا السطر يخبر Next.js بتجاهل تعارضات Webpack
   images: {
     remotePatterns: [ // تحديث الإعدادات لتفادي تحذيرات الـ Deprecation
       {
         protocol: 'https',
-        hostname: 'oacgwabzxojphecskyex.supabase.co',
+        hostname: 'https://dimacardapp2.vercel.app',
+        port: '',
+        pathname: '/**',
       },
     ],
   },
+  turbopack: {},
 };
 
 export default withPWA(nextConfig);
