@@ -5,15 +5,13 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
-  skipWaiting: true,
+  //skipWaiting: true,
 });
 
 const nextConfig: NextConfig = {
-  // 🟢 هادي هي الإضافة اللي كتحل المشكل في Vercel
-  turbopack: {},
-
+  turbopack: {}, // هذا السطر يخبر Next.js بتجاهل تعارضات Webpack
   images: {
-    remotePatterns: [
+    remotePatterns: [ // تحديث الإعدادات لتفادي تحذيرات الـ Deprecation
       {
         protocol: 'https',
         hostname: 'oacgwabzxojphecskyex.supabase.co',
