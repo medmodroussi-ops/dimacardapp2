@@ -5,12 +5,20 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
-  //skipWaiting: true,
+  skipWaiting: true,
 });
 
 const nextConfig: NextConfig = {
+  // 🟢 هادي هي الإضافة اللي كتحل المشكل في Vercel
+  turbopack: {},
+
   images: {
-    domains: ['oacgwabzxojphecskyex.supabase.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'oacgwabzxojphecskyex.supabase.co',
+      },
+    ],
   },
 };
 
