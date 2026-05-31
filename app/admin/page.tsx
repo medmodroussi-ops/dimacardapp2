@@ -31,9 +31,36 @@ export default function AdminDashboard() {
   const suspendedCards = profiles.filter(p => p.status === 'suspendu').length
 
   useEffect(() => {
-    fetchGlobalData()
+    checkAdminAndFetchData()
   }, [])
 
+
+
+  async function checkAdminAndFetchData() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      // 1. التحقق من أن اليوزر هو "admin"
+      // كنفترضو عندك جدول سميتو 'profiles' فيه كولون 'role'
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError || profile?.role !== 'admin') {
+        toast.error("Accès non autorisé !")
+        router.push('/dashboard') // صيفطو للداشبورد العادي إلا ما كانش أدمن
+        return
+      }
+
+      // 2. إلا كان أدمن، كمل تحميل البيانات
+      await fetchGlobalData()
+    } catch (error) {
+      router.push('/dashboard')
+    }
+  }
   // 1. CHARGEMENT DE TOUTES LES CARTES
   async function fetchGlobalData() {
     try {
